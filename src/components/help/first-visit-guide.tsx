@@ -18,6 +18,19 @@ export default function FirstVisitGuide({ userId }: { userId: string }) {
     }
   }, [storageKey]);
 
+  useEffect(() => {
+    if (!open) return;
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    const previousTouchAction = body.style.touchAction;
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.touchAction = previousTouchAction;
+    };
+  }, [open]);
+
   const close = () => {
     try { localStorage.setItem(storageKey, "seen"); } catch {}
     setOpen(false);
@@ -26,14 +39,19 @@ export default function FirstVisitGuide({ userId }: { userId: string }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="nexora-first-visit-title">
-      <div className="w-full max-w-2xl overflow-hidden rounded-[2rem] border bg-card shadow-2xl">
-        <div className="relative border-b p-6 sm:p-8">
-          <button type="button" onClick={close} aria-label="Fermer le guide" className="absolute right-4 top-4 rounded-xl p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
+    <div
+      className="fixed inset-0 z-[100] overflow-y-auto overscroll-contain bg-black/55 p-3 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="nexora-first-visit-title"
+    >
+      <div className="mx-auto flex min-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[1.5rem] border bg-card shadow-2xl sm:min-h-0 sm:max-h-[calc(100dvh-2rem)] sm:rounded-[2rem]">
+        <div className="relative shrink-0 border-b p-5 sm:p-8">
+          <button type="button" onClick={close} aria-label="Fermer le guide" className="absolute right-3 top-3 rounded-xl p-2 text-muted-foreground hover:bg-accent hover:text-foreground sm:right-4 sm:top-4">
             <X className="h-5 w-5" />
           </button>
-          <div className="flex items-start gap-4 pr-8">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><BookOpen className="h-6 w-6" /></span>
+          <div className="flex items-start gap-3 pr-8 sm:gap-4">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary sm:h-12 sm:w-12"><BookOpen className="h-6 w-6" /></span>
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Première visite</p>
               <h2 id="nexora-first-visit-title" className="mt-1 text-2xl font-black sm:text-3xl">Bienvenue sur NEXORA 👋</h2>
@@ -42,7 +60,7 @@ export default function FirstVisitGuide({ userId }: { userId: string }) {
           </div>
         </div>
 
-        <div className="p-6 sm:p-8">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-8">
           <div className="grid gap-3">
             {[
               ["1", "Regarde", "Commence par ton tableau de bord : ce qui entre, ce qui sort et ce qui reste."],
@@ -62,11 +80,11 @@ export default function FirstVisitGuide({ userId }: { userId: string }) {
             <p className="mt-1 text-muted-foreground">Tu n'as pas besoin de tout comprendre aujourd'hui. Avance étape par étape.</p>
           </div>
 
-          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <button type="button" onClick={close} className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold hover:bg-accent">
+          <div className="mt-6 flex flex-col-reverse gap-2 pb-[env(safe-area-inset-bottom)] sm:flex-row sm:items-center sm:justify-between">
+            <button type="button" onClick={close} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold hover:bg-accent">
               <Check className="h-4 w-4" /> J'ai compris
             </button>
-            <Link href="/aide#demarrage" onClick={close} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">
+            <Link href="/aide#demarrage" onClick={close} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">
               Me guider pas à pas <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
