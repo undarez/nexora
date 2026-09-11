@@ -1,8 +1,9 @@
+import { nexoraBrainChat, nexoraBrainConfigured, nexoraBrainHealth } from "@/lib/lia/brain";
 import { ollamaChat, ollamaConfig, ollamaEnabled } from "@/lib/ollama/client";
 
 export type LiaProviderMessage = { role: "system" | "user" | "assistant"; content: string };
-export type LiaProviderName = "ollama" | "remote" | "deterministic";
-export type LiaProviderMode = "local_first" | "local_only" | "remote_only" | "deterministic_only";
+export type LiaProviderName = "native" | "ollama" | "remote" | "deterministic";
+export type LiaProviderMode = "native_first" | "native_only" | "local_first" | "local_only" | "remote_only" | "deterministic_only";
 export type LiaProviderUsage = {
   inputChars?: number | null;
   outputChars?: number | null;
@@ -21,13 +22,14 @@ function remoteConfig() {
 }
 
 export function liaProviderConfig() {
-  const raw = (process.env.LIA_PROVIDER_MODE || "local_first").toLowerCase();
-  const mode: LiaProviderMode = ["local_first", "local_only", "remote_only", "deterministic_only"].includes(raw)
+  const raw = (process.env.LIA_PROVIDER_MODE || "native_first").toLowerCase();
+  const mode: LiaProviderMode = ["native_first", "native_only", "local_first", "local_only", "remote_only", "deterministic_only"].includes(raw)
     ? raw as LiaProviderMode
-    : "local_first";
+    : "native_first";
   const remote = remoteConfig();
   return {
     mode,
+    native: { configured: nexoraBrainConfigured(), model: process.env.NEXORA_BRAIN_MODEL || "nexora-lia" },
     local: ollamaConfig(),
     remote: { configured: Boolean(remote.url && remote.key && remote.model), model: remote.model || null, urlConfigured: Boolean(remote.url) },
     remoteFallbackExplicitlyEnabled: process.env.LIA_ALLOW_REMOTE_FALLBACK === "true",
@@ -70,19 +72,31 @@ function deterministicFallback(question: string) {
     "",
     `Question reçue : ${question}`,
     "",
-    "Les données financières restent protégées côté serveur. Le moteur déterministe peut préparer et vérifier les éléments, puis une réponse générative pourra être produite dès qu'un fournisseur LIA est disponible.",
-    "Prochaine vérification : disponibilité du moteur LIA.",
+    "Les données financières restent protégées côté serveur. Le moteur déterministe peut préparer et vérifier les éléments, puis une réponse générative pourra être produite dès que le cerveau NEXORA est disponible.",
+    "Prochaine vérification : disponibilité du moteur NEXORA Brain.",
   ].join("\n");
 }
 
 /**
- * Provider boundary: the cognitive core does not depend on an external AI provider.
- * Remote inference is opt-in for fallback so a missing local model can never
- * silently create hosted inference spend.
+ * Provider boundary: the application is not coupled to Ollama or a hosted AI vendor.
+ * NEXORA Brain is tried first when configured. Remote inference remains opt-in.
  */
 export async function liaChat(messages: LiaProviderMessage[], signal?: AbortSignal): Promise<LiaProviderResult> {
   const config = liaProviderConfig();
   const errors: string[] = [];
+
+  if (config.mode === "native_first" || config.mode === "native_only") {
+    if (config.native.configured) {
+      try {
+        return await nexoraBrainChat(messages, signal);
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : "NEXORA Brain indisponible.");
+        if (config.mode === "native_only") return { content: deterministicFallback([...messages].reverse().find(m => m.role === "user")?.content || ""), model: "deterministic-fallback", provider: "deterministic" };
+      }
+    } else if (config.mode === "native_only") {
+      return { content: deterministicFallback([...messages].reverse().find(m => m.role === "user")?.content || ""), model: "deterministic-fallback", provider: "deterministic" };
+    }
+  }
 
   if (config.mode !== "remote_only" && config.mode !== "deterministic_only" && ollamaEnabled()) {
     try {
@@ -105,7 +119,7 @@ export async function liaChat(messages: LiaProviderMessage[], signal?: AbortSign
     }
   }
 
-  const remoteAllowed = config.mode === "remote_only" || (config.mode === "local_first" && config.remoteFallbackExplicitlyEnabled);
+  const remoteAllowed = config.mode === "remote_only" || ((config.mode === "local_first" || config.mode === "native_first") && config.remoteFallbackExplicitlyEnabled);
   if (remoteAllowed) {
     try {
       return await remoteChat(messages, signal);
@@ -121,24 +135,28 @@ export async function liaChat(messages: LiaProviderMessage[], signal?: AbortSign
 
 export async function liaProviderHealth() {
   const config = liaProviderConfig();
+  const native = { configured: config.native.configured, healthy: false };
   const local = { configured: config.local.enabled, healthy: false };
   const remote = { configured: config.remote.configured, healthy: false };
 
-  if (config.mode !== "remote_only" && config.mode !== "deterministic_only") {
+  if (config.mode === "native_first" || config.mode === "native_only") {
+    native.healthy = await nexoraBrainHealth();
+  }
+
+  if (config.mode !== "native_only" && config.mode !== "remote_only" && config.mode !== "deterministic_only") {
     try {
       const { ollamaHealth } = await import("@/lib/ollama/client");
       local.healthy = await ollamaHealth();
     } catch {}
   }
 
-  // Deliberately do not make a billable remote request for health checks.
   remote.healthy = false;
 
   const selected = config.mode === "deterministic_only"
     ? "deterministic"
     : config.mode === "remote_only"
       ? (remote.configured ? "remote" : "deterministic")
-      : local.healthy ? "ollama" : (config.remoteFallbackExplicitlyEnabled && remote.configured ? "remote" : "deterministic");
+      : native.healthy ? "native" : local.healthy ? "ollama" : (config.remoteFallbackExplicitlyEnabled && remote.configured ? "remote" : "deterministic");
 
-  return { mode: config.mode, selected, local, remote, remoteFallbackExplicitlyEnabled: config.remoteFallbackExplicitlyEnabled };
+  return { mode: config.mode, selected, native, local, remote, remoteFallbackExplicitlyEnabled: config.remoteFallbackExplicitlyEnabled };
 }
