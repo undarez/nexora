@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+const checks=[];
+const lib=fs.readFileSync('src/lib/lia/self-evaluation.ts','utf8');
+const route=fs.readFileSync('src/app/api/lia/chat/route.ts','utf8');
+const mig=fs.readFileSync('supabase/migrations/0105_lia_response_evaluations.sql','utf8');
+checks.push(['deterministic evaluator',lib.includes('evaluateAndCorrectLiaResponse')]);
+checks.push(['authority invariant',lib.includes('financialWriteAuthorized: false') && lib.includes('selfAuthorizationAllowed: false')]);
+checks.push(['blocks unverified financial action',lib.includes('UNVERIFIED_FINANCIAL_ACTION')]);
+checks.push(['missing context guard',lib.includes('MISSING_FINANCIAL_CONTEXT')]);
+checks.push(['external fact guard',lib.includes('UNVERIFIED_EXTERNAL_FACT')]);
+checks.push(['critique contradiction guard',lib.includes('CRITIQUE_ACTION_CONTRADICTION')]);
+checks.push(['integrated chat',route.includes('evaluateAndCorrectLiaResponse') && route.includes('selfEvaluation')]);
+checks.push(['evaluation persisted',route.includes('lia_response_evaluations')]);
+checks.push(['rls enabled',mig.includes('enable row level security')]);
+checks.push(['owner isolation',mig.includes('auth.uid() = user_id')]);
+for(const [n,ok] of checks) console.log(`${ok?'PASS':'FAIL'} ${n}`);
+if(checks.some(([,ok])=>!ok)) process.exit(1);
+console.log(`V5.08.51 regression: ${checks.length}/${checks.length} PASS`);

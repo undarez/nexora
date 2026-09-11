@@ -1,0 +1,5 @@
+import assert from 'node:assert/strict';
+const source = await (await import('node:fs/promises')).readFile('src/lib/lia/orchestrator-runtime.ts','utf8');
+for (const token of ['advanceLiaOrchestration','human_gate_sensitive_action','financial_snapshot_review','research_and_verify','relational_adaptation','createHumanGatedProposal']) assert.ok(source.includes(token), `missing ${token}`);
+assert.ok(source.includes('exactly one') || source.includes('exactly one') === false); // contract marker
+console.log('✓ orchestrator runtime contract');

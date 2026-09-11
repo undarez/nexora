@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 250" role="img" aria-label="NEXORA — Votre intelligence financière">
+  <defs>
+    <linearGradient id="nexoraGreen" x1="20" y1="104" x2="108" y2="16" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8AF34D"/><stop offset=".48" stop-color="#36E26F"/><stop offset="1" stop-color="#0AAE91"/></linearGradient>
+    <linearGradient id="nexoraTeal" x1="42" y1="28" x2="88" y2="92" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#61F17A"/><stop offset=".5" stop-color="#18C98A"/><stop offset="1" stop-color="#008FA0"/></linearGradient>
+  </defs>
+  <g transform="translate(8 52) scale(1.12)">
+    <path d="M30 98.5C17.5 87.7 11.5 71.7 13.8 55.8C16.1 39.6 25.5 25.4 39.4 17.1C50.2 10.7 62.5 8.5 74.2 10.8" fill="none" stroke="url(#nexoraGreen)" stroke-width="7" stroke-linecap="round"/>
+    <path d="M98.4 30.1C109.1 42.4 113.8 58.4 111.2 74.1C108.8 88.3 101.2 100.5 89.9 108.4" fill="none" stroke="url(#nexoraTeal)" stroke-width="7" stroke-linecap="round"/>
+    <path d="M29.5 98.5L46.5 39.2C49.4 29.1 61.8 25.6 69.5 32.9L84.5 47.1L101.6 20.1V38.4L114.5 31.2L107.2 57.1L99.2 45.4L78.3 77.8C72.6 86.6 60.2 88.1 52.2 80.1L42.2 70.1L35.7 99.7Z" fill="url(#nexoraGreen)"/>
+    <path d="M49.1 40.7C52.2 34.8 59.9 32.8 65.1 37.4L81.2 51.7L73.6 63.2L61.6 52.5C57.7 49.1 52.1 50.7 50.6 55.5L43.1 79.5L37.3 98.9L29.5 98.5L46.5 39.2C47.1 37.1 48 35.1 49.1 33.5Z" fill="url(#nexoraTeal)" opacity=".88"/>
+    <path d="M101.6 20.1L114.5 31.2L107.2 57.1L100.5 46.8L94.4 50.2L101.6 20.1Z" fill="#6CF04C"/>
+  </g>
+  <text x="150" y="132" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="900" letter-spacing="-5" fill="#f8fafc">NEXORA</text>
+  <rect x="487" y="65" width="19" height="9" rx="4.5" transform="rotate(-43 496.5 69.5)" fill="#36E26F"/>
+  <text x="153" y="170" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" letter-spacing="5.1" fill="#5BEF84">VOTRE INTELLIGENCE FINANCIÈRE</text>
+</svg>

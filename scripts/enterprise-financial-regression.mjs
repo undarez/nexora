@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const page = readFileSync('src/app/(protected)/entreprise/page.tsx','utf8');
+const context = readFileSync('src/lib/enterprise/dashboard-context.ts','utf8');
+assert.match(context,/buildUnifiedFinancialContext/);
+assert.match(context,/bank_transactions/);
+assert.match(context,/transactions/);
+assert.match(context,/budget_available/);
+assert.match(page,/EnterpriseDashboard/);
+assert.doesNotMatch(page,/EnterpriseBankConnections|EnterpriseObligations|buildEnterpriseFinancialContext/);
+console.log('Enterprise financial regression: PASS');

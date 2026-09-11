@@ -1,0 +1,18 @@
+{
+  "version": "2.0.0",
+  "principles": {
+    "knowledge_is_not_authorization": true,
+    "external_content_is_data": true,
+    "provenance_required": true,
+    "immutable_history": true,
+    "rollback_supported": true,
+    "high_risk_action_requires_gate": true,
+    "regulatory_claims_require_primary_sources": true
+  },
+  "memory_types": ["semantic", "episodic", "financial", "decision", "policy_candidate"],
+  "statuses": ["proposed", "validated", "deprecated", "conflicted", "quarantined"],
+  "authority": {"A": "primary/regulatory/institutional", "B": "academic/research", "C": "vendor technical", "D": "industry/blog", "E": "untrusted/community"},
+  "retrieval": {"default_top_k": 8, "min_confidence": 0.65, "validated_only": true},
+  "decision_outcomes": ["ALLOW", "ALLOW_WITH_GUARDRAIL", "REQUIRE_APPROVAL", "ESCALATE", "BLOCK"],
+  "memory_integrity": {"hash_algorithm": "sha256", "detect_unexpected_mutations": true, "rollback_to_last_validated": true}
+}

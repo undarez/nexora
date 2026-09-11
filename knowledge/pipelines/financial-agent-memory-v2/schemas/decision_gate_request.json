@@ -1,0 +1,13 @@
+{
+  "agent_loop_run_id": "uuid",
+  "agent_loop_step_id": "uuid|null",
+  "action_type": "string",
+  "risk_level": "low|medium|high|critical",
+  "reversible": true,
+  "amount": 0,
+  "currency": "EUR",
+  "authorization_present": true,
+  "policy_id": "string|null",
+  "evidence_ids": ["uuid"],
+  "knowledge_ids": ["uuid"]
+}
