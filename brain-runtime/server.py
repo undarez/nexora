@@ -45,16 +45,11 @@ def authorize(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="Invalid NEXORA Brain API key")
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
+def health_payload() -> dict[str, Any]:
     return {"status": "ok", "model": MODEL_NAME}
 
 
-@app.post("/chat/completions")
-def chat_completions(
-    request: ChatRequest,
-    authorization: str | None = Header(default=None),
-) -> dict[str, Any]:
+def generate(request: ChatRequest, authorization: str | None) -> dict[str, Any]:
     authorize(authorization)
     if request.stream:
         raise HTTPException(status_code=400, detail="Streaming is not enabled in the first NEXORA Brain runtime.")
@@ -84,3 +79,18 @@ def chat_completions(
         ],
         "usage": usage,
     }
+
+
+@app.get("/health")
+@app.get("/v1/health")
+def health() -> dict[str, Any]:
+    return health_payload()
+
+
+@app.post("/chat/completions")
+@app.post("/v1/chat/completions")
+def chat_completions(
+    request: ChatRequest,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    return generate(request, authorization)
