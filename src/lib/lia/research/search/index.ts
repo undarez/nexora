@@ -1,6 +1,16 @@
 import { getResearchDomainPolicy } from "@/lib/lia/research/trust/registry";
 
-export type SearchResult = { title:string; url:string; snippet?:string; publishedAt?:string|null; provider:string };
+export type SearchResult = {
+  title:string;
+  url:string;
+  snippet?:string;
+  publishedAt?:string|null;
+  provider:string;
+  trustScore?:number;
+  sourceClass?:string;
+  organization?:string;
+  trusted?:boolean;
+};
 export type SearchProvider = { name:string; search(query:string, limit:number):Promise<SearchResult[]> };
 
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
@@ -13,7 +23,7 @@ class BraveProvider implements SearchProvider {
   if(!key) throw new Error("search_provider_not_configured");
   const endpoint=process.env.BRAVE_SEARCH_API_URL||"https://api.search.brave.com/res/v1/web/search";
   const url=new URL(endpoint); url.searchParams.set("q",query); url.searchParams.set("count",String(clamp(limit,1,20)));
-  const r=await fetch(url,{headers:{Accept:"application/json", "X-Subscription-Token":key},signal:AbortSignal.timeout(10000)});
+  const r=await fetch(url,{headers:{Accept:"application/json","X-Subscription-Token":key},signal:AbortSignal.timeout(10000)});
   if(!r.ok)throw new Error(`search_upstream_${r.status}`);
   const data=await r.json() as {web?:{results?:Array<{title?:string,url?:string,description?:string,page_age?:string}>}};
   return (data.web?.results||[]).flatMap(x=>{const u=x.url?cleanUrl(x.url):null; return u&&x.title?[{title:x.title,url:u,snippet:x.description,publishedAt:x.page_age||null,provider:this.name}]:[]});
@@ -33,30 +43,44 @@ class TavilyProvider implements SearchProvider {
  }
 }
 
-export function getSearchProvider():SearchProvider|null{
- const selected=(process.env.LIA_SEARCH_PROVIDER||"").trim().toLowerCase();
- if(selected==="brave")return new BraveProvider();
- if(selected==="tavily")return new TavilyProvider();
- if(selected==="none"||!selected)return null;
- throw new Error("unknown_search_provider");
+function configuredProviders():SearchProvider[]{
+ const selected=(process.env.LIA_SEARCH_PROVIDER||"auto").trim().toLowerCase();
+ const providers:SearchProvider[]=[];
+ if(selected==="brave"||selected==="auto")providers.push(new BraveProvider());
+ if(selected==="tavily"||selected==="auto")providers.push(new TavilyProvider());
+ if(selected==="none")return [];
+ if(!providers.length)throw new Error("unknown_search_provider");
+ return providers;
 }
 
-export function filterTrustedSearchResults(results:SearchResult[],limit=8){
+export function getSearchProvider():SearchProvider|null{return configuredProviders()[0]||null;}
+
+export function rankSearchResults(results:SearchResult[],limit=8){
  const out:SearchResult[]=[]; const seen=new Set<string>();
  for(const result of results){
   const u=cleanUrl(result.url); if(!u)continue;
-  const host=new URL(u).hostname; const policy=getResearchDomainPolicy(host);
-  if(!policy.allowed)continue;
-  const key=new URL(u).origin+new URL(u).pathname;
-  if(seen.has(key))continue; seen.add(key); out.push({...result,url:u}); if(out.length>=clamp(limit,1,8))break;
+  const parsed=new URL(u); const policy=getResearchDomainPolicy(parsed.hostname);
+  const key=parsed.origin+parsed.pathname;
+  if(seen.has(key))continue;
+  seen.add(key);
+  out.push({...result,url:u,trusted:policy.allowed,trustScore:policy.entry?.trustScore??45,sourceClass:policy.entry?.sourceClass??"UNREGISTERED",organization:policy.entry?.organization});
  }
- return out;
+ return out.sort((a,b)=>(b.trustScore??0)-(a.trustScore??0)).slice(0,clamp(limit,1,8));
 }
 
 export async function discoverTrustedSources(query:string,limit=5){
- const provider=getSearchProvider();
- if(!provider)return {provider:null,results:[],status:"not_configured" as const};
- const raw=await provider.search(query,clamp(limit*2,2,20));
- const results=filterTrustedSearchResults(raw,limit);
- return {provider:provider.name,results,status:results.length?"ok" as const:"no_trusted_results" as const};
+ const providers=configuredProviders();
+ if(!providers.length)return {provider:null,providers:[],results:[],status:"not_configured" as const};
+ const errors:string[]=[]; const raw:SearchResult[]=[];
+ for(const provider of providers){
+  try{const found=await provider.search(query,clamp(limit*3,3,20)); raw.push(...found);}catch(e){errors.push(`${provider.name}:${e instanceof Error?e.message:"search_failed"}`);}
+ }
+ const results=rankSearchResults(raw,limit);
+ return {
+  provider:results[0]?.provider||providers[0]?.name||null,
+  providers:providers.map(p=>p.name),
+  results,
+  status:results.length?"ok" as const:errors.length?"search_failed" as const:"no_results" as const,
+  errors:errors.length?errors:undefined,
+ };
 }
