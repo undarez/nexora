@@ -1,4 +1,4 @@
-import type { LiaSkillPermission } from "./types";
+import type { LiaPermission } from "./types";
 import { registerExecutableLiaSkill } from "@/lib/lia/agent/skill-runtime";
 
 export type FinanceTransaction = {
@@ -60,7 +60,7 @@ registerExecutableLiaSkill<FinanceAnalyticsInput, FinanceAnalyticsOutput>({
   name: "Analyse financière",
   description: "Calcule les revenus, dépenses, solde net et dépenses par catégorie à partir de transactions déjà autorisées.",
   capabilities: ["spending_analysis", "income_analysis", "category_breakdown"],
-  requiredPermissions: ["finance.read"] as readonly LiaSkillPermission[],
+  requiredPermissions: ["finance.read"] as readonly LiaPermission[],
   riskClass: "read",
   execute: async input => calculateFinanceAnalytics(input),
   verify: async output => ({
