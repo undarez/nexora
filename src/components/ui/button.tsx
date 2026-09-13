@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "default" | "outline" | "ghost" | "secondary" | "destructive";
-type Size = "default" | "sm";
+type Size = "default" | "sm" | "icon";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -21,6 +21,7 @@ export function Button({
         "nexora-button inline-flex items-center justify-center rounded-[10px] font-semibold shadow-none transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
         size === "default" && "px-4 py-2 text-sm",
         size === "sm" && "px-3 py-1.5 text-xs",
+        size === "icon" && "h-9 w-9 p-0",
         variant === "default" &&
           "bg-primary text-primary-foreground hover:-translate-y-0.5 hover:brightness-105",
         variant === "outline" &&
