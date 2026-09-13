@@ -9,7 +9,8 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
 
     const params = new URL(request.url).searchParams;
-    const days = Math.min(Math.max(Number(params.get("days") ?? 90), 7), 365);
+    const requestedDays = Number(params.get("days") ?? 90);
+    const days = Number.isFinite(requestedDays) ? Math.min(Math.max(Math.round(requestedDays), 1), 3650) : 90;
     const since = new Date(Date.now() - days * 86400000).toISOString();
     const { data, error } = await supabase
       .from("bank_balance_snapshots")
@@ -19,7 +20,6 @@ export async function GET(request: Request) {
       .order("captured_at", { ascending: true });
     if (error) throw error;
 
-    // Keep currencies isolated: summing EUR + USD would produce a meaningless total.
     const daily = new Map<string, Record<string, number>>();
     for (const row of data ?? []) {
       const date = String(row.captured_at).slice(0, 10);
