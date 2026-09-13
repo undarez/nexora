@@ -88,7 +88,8 @@ export async function liaChat(messages: LiaProviderMessage[], signal?: AbortSign
   if (config.mode === "native_first" || config.mode === "native_only") {
     if (config.native.configured) {
       try {
-        return await nexoraBrainChat(messages, signal);
+        const result = await nexoraBrainChat(messages, signal);
+        return { ...result, provider: result.provider === "llama_cpp" ? "native" : result.provider };
       } catch (error) {
         errors.push(error instanceof Error ? error.message : "NEXORA Brain indisponible.");
         if (config.mode === "native_only") return { content: deterministicFallback([...messages].reverse().find(m => m.role === "user")?.content || ""), model: "deterministic-fallback", provider: "deterministic" };
@@ -128,35 +129,19 @@ export async function liaChat(messages: LiaProviderMessage[], signal?: AbortSign
     }
   }
 
-  const userMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
-  const fallback = deterministicFallback(userMessage.slice(0, 1000));
-  return { content: errors.length ? `${fallback}\n\nContrôle provider : ${errors[0].slice(0, 300)}` : fallback, model: "deterministic-fallback", provider: "deterministic" };
+  if (config.mode === "deterministic_only" || errors.length === 0) {
+    return { content: deterministicFallback([...messages].reverse().find(m => m.role === "user")?.content || ""), model: "deterministic-fallback", provider: "deterministic" };
+  }
+
+  return { content: deterministicFallback([...messages].reverse().find(m => m.role === "user")?.content || ""), model: "deterministic-fallback", provider: "deterministic" };
 }
 
 export async function liaProviderHealth() {
   const config = liaProviderConfig();
-  const native = { configured: config.native.configured, healthy: false };
-  const local = { configured: config.local.enabled, healthy: false };
-  const remote = { configured: config.remote.configured, healthy: false };
-
-  if (config.mode === "native_first" || config.mode === "native_only") {
-    native.healthy = await nexoraBrainHealth();
-  }
-
-  if (config.mode !== "native_only" && config.mode !== "remote_only" && config.mode !== "deterministic_only") {
-    try {
-      const { ollamaHealth } = await import("@/lib/ollama/client");
-      local.healthy = await ollamaHealth();
-    } catch {}
-  }
-
-  remote.healthy = false;
-
-  const selected = config.mode === "deterministic_only"
-    ? "deterministic"
-    : config.mode === "remote_only"
-      ? (remote.configured ? "remote" : "deterministic")
-      : native.healthy ? "native" : local.healthy ? "ollama" : (config.remoteFallbackExplicitlyEnabled && remote.configured ? "remote" : "deterministic");
-
-  return { mode: config.mode, selected, native, local, remote, remoteFallbackExplicitlyEnabled: config.remoteFallbackExplicitlyEnabled };
+  return {
+    mode: config.mode,
+    native: { configured: config.native.configured, healthy: config.native.configured ? await nexoraBrainHealth() : false },
+    local: config.local,
+    remote: { configured: config.remote.configured, healthy: false },
+  };
 }
