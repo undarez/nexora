@@ -6,11 +6,23 @@ import crypto from "node:crypto";
 const provider = "powens";
 
 function config() {
-  const domain = process.env.POWENS_DOMAIN?.trim();
+  const rawDomain = process.env.POWENS_DOMAIN?.trim();
   const clientId = process.env.POWENS_CLIENT_ID?.trim();
   const clientSecret = process.env.POWENS_CLIENT_SECRET?.trim();
-  if (!domain || !clientId || !clientSecret) throw new Error("Powens non configuré côté serveur.");
-  return { domain: domain.replace(/^https?:\/\//, "").replace(/\/$/, ""), clientId, clientSecret };
+  if (!rawDomain || !clientId || !clientSecret) {
+    throw new Error("Powens non configuré côté serveur. Vérifiez POWENS_DOMAIN, POWENS_CLIENT_ID et POWENS_CLIENT_SECRET.");
+  }
+
+  let domain: string;
+  try {
+    const normalized = rawDomain.startsWith("http://") || rawDomain.startsWith("https://") ? rawDomain : `https://${rawDomain}`;
+    const parsed = new URL(normalized);
+    domain = parsed.hostname;
+  } catch {
+    throw new Error("POWENS_DOMAIN est invalide. Utilisez par exemple nexora-sandbox.biapi.pro.");
+  }
+
+  return { domain, clientId, clientSecret };
 }
 
 async function powensFetch(path: string, token: string, init?: RequestInit) {
@@ -116,11 +128,7 @@ export const powensAdapter: BankingProviderAdapter = {
     const { body } = await getConnection({ userId, connectionId });
     const state = body.state == null ? null : String(body.state);
     const connector = body.connector as Record<string, unknown> | undefined;
-    return {
-      state,
-      institutionName: connector?.name ? String(connector.name) : null,
-      consentExpiresAt: body.access_expire ? String(body.access_expire) : (body.expire ? String(body.expire) : null),
-    };
+    return { state, institutionName: connector?.name ? String(connector.name) : null, consentExpiresAt: body.access_expire ? String(body.access_expire) : (body.expire ? String(body.expire) : null) };
   },
   async listAccounts({ userId, connectionId }) {
     const { token, externalConnectionId } = await getConnection({ userId, connectionId });
@@ -131,19 +139,13 @@ export const powensAdapter: BankingProviderAdapter = {
     const ids = externalAccountIds.map((id) => String(id).trim()).filter(Boolean);
     if (!ids.length) throw new Error("Aucun compte à activer.");
     const { token, externalConnectionId } = await getConnection({ userId, connectionId });
-    await powensFetch(`/users/me/connections/${encodeURIComponent(externalConnectionId)}/accounts/${ids.map(encodeURIComponent).join(",")}?all`, token, {
-      method: "PUT",
-      body: JSON.stringify({ disabled: false }),
-    });
+    await powensFetch(`/users/me/connections/${encodeURIComponent(externalConnectionId)}/accounts/${ids.map(encodeURIComponent).join(",")}?all`, token, { method: "PUT", body: JSON.stringify({ disabled: false }) });
   },
   async deactivateAccounts({ userId, connectionId, externalAccountIds }) {
     const ids = externalAccountIds.map((id) => String(id).trim()).filter(Boolean);
     if (!ids.length) throw new Error("Aucun compte à désactiver.");
     const { token, externalConnectionId } = await getConnection({ userId, connectionId });
-    await powensFetch(`/users/me/connections/${encodeURIComponent(externalConnectionId)}/accounts/${ids.map(encodeURIComponent).join(",")}?all`, token, {
-      method: "PUT",
-      body: JSON.stringify({ disabled: true }),
-    });
+    await powensFetch(`/users/me/connections/${encodeURIComponent(externalConnectionId)}/accounts/${ids.map(encodeURIComponent).join(",")}?all`, token, { method: "PUT", body: JSON.stringify({ disabled: true }) });
   },
   async disconnect({ userId, connectionId }) {
     const admin = getSupabaseAdmin();
@@ -157,13 +159,10 @@ export const powensAdapter: BankingProviderAdapter = {
   async sync({ connectionId, userId }) {
     const admin = getSupabaseAdmin();
     if (!admin) throw new Error("Supabase serveur indisponible.");
-    const { data: connection, error } = await admin.from("bank_connections")
-      .select("external_connection_id").eq("id", connectionId).eq("user_id", userId).maybeSingle();
+    const { data: connection, error } = await admin.from("bank_connections").select("external_connection_id").eq("id", connectionId).eq("user_id", userId).maybeSingle();
     if (error) throw error;
     if (!connection?.external_connection_id) throw new Error("Connexion Powens non finalisée.");
-    const vault = await admin.from("financial_secure_vault_items").select("ciphertext,iv,auth_tag")
-      .eq("user_id", userId).eq("provider_ref", "powens:user").eq("status", "active")
-      .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    const vault = await admin.from("financial_secure_vault_items").select("ciphertext,iv,auth_tag").eq("user_id", userId).eq("provider_ref", "powens:user").eq("status", "active").order("updated_at", { ascending: false }).limit(1).maybeSingle();
     if (vault.error) throw vault.error;
     if (!vault.data) throw new Error("Jeton Powens absent du coffre.");
     const secret = decryptVaultPayload(vault.data) as { token?: string };
@@ -180,24 +179,15 @@ export const powensAdapter: BankingProviderAdapter = {
       let pages = 0;
       while (next && pages < 50 && transactions.length < 50000) {
         const page: Record<string, unknown> = next.startsWith("http") ? await fetchPowensHref(next, token) : await powensFetch(next, token);
-        if (Array.isArray(page.transactions)) {
-          for (const t of page.transactions as Record<string, unknown>[]) transactions.push({ ...t, accountExternalId: accountId });
-        }
+        if (Array.isArray(page.transactions)) for (const t of page.transactions as Record<string, unknown>[]) transactions.push({ ...t, accountExternalId: accountId });
         const candidate: unknown = (page as { _links?: { next?: { href?: string } } })._links?.next?.href;
         next = typeof candidate === "string" ? candidate : null;
         pages += 1;
       }
     }
     return {
-      accounts: accounts.map((a) => ({
-        id: a.id, name: a.name, type: a.type, currency: a.currency, balance: a.balance, availableBalance: a.available_balance ?? a.balance,
-        ibanMasked: a.iban ? `••••${String(a.iban).slice(-4)}` : null,
-      })),
-      transactions: transactions.map((t) => ({
-        id: t.id, accountExternalId: t.accountExternalId, bookedAt: t.application_date ?? t.date, valueDate: t.vdate ?? t.date,
-        description: t.original_wording ?? t.wording ?? "Opération bancaire", merchantName: t.original_wording ?? null,
-        amount: Number(t.value ?? 0), currency: t.currency ?? "EUR", pending: false, category: (t.category as { name?: string } | undefined)?.name ?? null,
-      })).filter((t) => t.accountExternalId != null),
+      accounts: accounts.map((a) => ({ id: a.id, name: a.name, type: a.type, currency: a.currency, balance: a.balance, availableBalance: a.available_balance ?? a.balance, ibanMasked: a.iban ? `••••${String(a.iban).slice(-4)}` : null })),
+      transactions: transactions.map((t) => ({ id: t.id, accountExternalId: t.accountExternalId, bookedAt: t.application_date ?? t.date, valueDate: t.vdate ?? t.date, description: t.original_wording ?? t.wording ?? "Opération bancaire", merchantName: t.original_wording ?? null, amount: Number(t.value ?? 0), currency: t.currency ?? "EUR", pending: false, category: (t.category as { name?: string } | undefined)?.name ?? null })).filter((t) => t.accountExternalId != null),
     };
   },
 };
