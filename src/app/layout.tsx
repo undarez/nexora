@@ -3,6 +3,7 @@ import "./globals.css";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DashboardBankingInteractionBridge } from "@/components/dashboard-banking-interaction-bridge";
 
 export const metadata: Metadata = {
   title: "Nexora",
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <Header />
           <div className="protected-app-shell">{children}</div>
+          <DashboardBankingInteractionBridge />
           <Footer />
         </ThemeProvider>
       </body>
