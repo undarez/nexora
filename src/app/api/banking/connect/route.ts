@@ -23,23 +23,19 @@ export async function POST(request: Request) {
     }
     const adapter = getBankingProvider(providerName);
     if (!adapter) {
-      return NextResponse.json({
-        error: "Aucun fournisseur Open Banking n'est actuellement activé.",
-        provider: providerName,
-        connectionCreated: false,
-        rawCredentialsAccepted: false,
-      }, { status: 503 });
+      return NextResponse.json({ error: "Aucun fournisseur Open Banking n'est actuellement activé.", provider: providerName, connectionCreated: false, rawCredentialsAccepted: false }, { status: 503 });
     }
     if (!adapter.createConnectionUrl) {
-      return NextResponse.json({
-        error: `Le fournisseur ${providerName} n'expose pas de flux de connexion bancaire.`,
-        provider: providerName,
-        connectionCreated: false,
-        rawCredentialsAccepted: false,
-      }, { status: 422 });
+      return NextResponse.json({ error: `Le fournisseur ${providerName} n'expose pas de flux de connexion bancaire.`, provider: providerName, connectionCreated: false, rawCredentialsAccepted: false }, { status: 422 });
     }
     const callbackPath = adapter.callbackPath ?? "/api/banking/callback";
-    const redirectUri = new URL(callbackPath, request.url).toString();
+    const configuredRedirect = process.env.POWENS_REDIRECT_URI?.trim();
+    let redirectUri: string;
+    try {
+      redirectUri = configuredRedirect ? new URL(configuredRedirect).toString() : new URL(callbackPath, request.url).toString();
+    } catch {
+      return NextResponse.json({ error: "POWENS_REDIRECT_URI est invalide. Utilise une URL HTTPS absolue vers le callback Powens." }, { status: 500 });
+    }
     const url = await adapter.createConnectionUrl({ userId: user.id, workspaceId, redirectUri, connectionId: body.connectionId, mode: body.mode ?? "connect" });
     return NextResponse.json({ provider: providerName, authorizationUrl: url, rawCredentialsAccepted: false });
   } catch (error) {
