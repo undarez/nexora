@@ -94,6 +94,7 @@
     "lia:financial-data-gateway-regression": "node scripts/lia-financial-data-gateway-regression.mjs",
     "lia:personal-financial-model": "node scripts/lia-personal-financial-model-regression.mjs",
     "typecheck": "tsc --noEmit",
+    "lia:agent-harness": "node --experimental-strip-types scripts/lia-agent-harness-regression.mjs",
     "banking:check": "node scripts/banking-regression.mjs",
     "financial:cross-domain": "node scripts/financial-cross-domain-regression.mjs",
     "finance:architecture": "node scripts/finance-architecture-regression.mjs",
