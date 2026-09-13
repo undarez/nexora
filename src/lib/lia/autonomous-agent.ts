@@ -70,49 +70,23 @@ const emptyObject = {
 function toolParameters(name: AutonomousToolName) {
   switch (name) {
     case "get_cashflow":
-      return {
-        type: "object",
-        properties: { days: { type: "integer", minimum: 1, maximum: 365, description: "Nombre de jours à analyser." } },
-        additionalProperties: false,
-      };
+      return { type: "object", properties: { days: { type: "integer", minimum: 1, maximum: 365, description: "Nombre de jours à analyser." } }, additionalProperties: false };
     case "search_transactions":
-      return {
-        type: "object",
-        properties: {
-          query: { type: "string", maxLength: 100, description: "Libellé ou terme à rechercher." },
-          limit: { type: "integer", minimum: 1, maximum: 100 },
-        },
-        additionalProperties: false,
-      };
+      return { type: "object", properties: { query: { type: "string", maxLength: 100, description: "Libellé ou terme à rechercher." }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false };
     case "search_use_cases":
     case "search_skills":
-      return {
-        type: "object",
-        properties: {
-          query: { type: "string", maxLength: 200 },
-          category: { type: "string", maxLength: 60 },
-          limit: { type: "integer", minimum: 1, maximum: 20 },
-        },
-        additionalProperties: false,
-      };
+      return { type: "object", properties: { query: { type: "string", maxLength: 200 }, category: { type: "string", maxLength: 60 }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false };
     case "learn_use_case":
       return {
         type: "object",
         required: ["name", "description", "objective", "trigger", "required_skills", "success_criteria", "verification_rules"],
         properties: {
-          name: { type: "string", minLength: 3, maxLength: 120 },
-          description: { type: "string", minLength: 10, maxLength: 500 },
-          category: { type: "string", maxLength: 60 },
-          objective: { type: "string", minLength: 5, maxLength: 1000 },
-          trigger: { type: "string", minLength: 5, maxLength: 500 },
-          required_context: { type: "array", items: { type: "string", maxLength: 200 }, maxItems: 20 },
-          required_skills: { type: "array", items: { type: "string", maxLength: 120 }, minItems: 1, maxItems: 20 },
-          suggested_tools: { type: "array", items: { type: "string", maxLength: 120 }, maxItems: 20 },
-          risk_class: { type: "string", enum: ["read", "recommendation", "write-sensitive", "critical"] },
-          minimum_autonomy: { type: "integer", minimum: 0, maximum: 3 },
-          human_approval_required: { type: "boolean" },
-          success_criteria: { type: "array", items: { type: "string", maxLength: 300 }, minItems: 1, maxItems: 20 },
-          verification_rules: { type: "array", items: { type: "string", maxLength: 300 }, minItems: 1, maxItems: 20 },
+          name: { type: "string", minLength: 3, maxLength: 120 }, description: { type: "string", minLength: 10, maxLength: 500 }, category: { type: "string", maxLength: 60 },
+          objective: { type: "string", minLength: 5, maxLength: 1000 }, trigger: { type: "string", minLength: 5, maxLength: 500 },
+          required_context: { type: "array", items: { type: "string", maxLength: 200 }, maxItems: 20 }, required_skills: { type: "array", items: { type: "string", maxLength: 120 }, minItems: 1, maxItems: 20 },
+          suggested_tools: { type: "array", items: { type: "string", maxLength: 120 }, maxItems: 20 }, risk_class: { type: "string", enum: ["read", "recommendation", "write-sensitive", "critical"] },
+          minimum_autonomy: { type: "integer", minimum: 0, maximum: 3 }, human_approval_required: { type: "boolean" },
+          success_criteria: { type: "array", items: { type: "string", maxLength: 300 }, minItems: 1, maxItems: 20 }, verification_rules: { type: "array", items: { type: "string", maxLength: 300 }, minItems: 1, maxItems: 20 },
         },
         additionalProperties: false,
       };
@@ -121,16 +95,10 @@ function toolParameters(name: AutonomousToolName) {
         type: "object",
         required: ["name", "description", "procedure"],
         properties: {
-          name: { type: "string", minLength: 3, maxLength: 120 },
-          description: { type: "string", minLength: 10, maxLength: 500 },
-          category: { type: "string", maxLength: 60 },
-          procedure: { type: "string", minLength: 20, maxLength: 12000 },
-          trigger_context: { type: "object", additionalProperties: true },
-          expected_result: { type: "string", maxLength: 1000 },
-          verification_steps: { type: "array", items: { type: "string", maxLength: 300 }, maxItems: 10 },
-          failure_modes: { type: "array", items: { type: "string", maxLength: 300 }, maxItems: 10 },
-          source_refs: { type: "array", items: { type: "string", maxLength: 200 }, maxItems: 10 },
-          correction: { type: "string", maxLength: 5000 },
+          name: { type: "string", minLength: 3, maxLength: 120 }, description: { type: "string", minLength: 10, maxLength: 500 }, category: { type: "string", maxLength: 60 },
+          procedure: { type: "string", minLength: 20, maxLength: 12000 }, trigger_context: { type: "object", additionalProperties: true }, expected_result: { type: "string", maxLength: 1000 },
+          verification_steps: { type: "array", items: { type: "string", maxLength: 300 }, maxItems: 10 }, failure_modes: { type: "array", items: { type: "string", maxLength: 300 }, maxItems: 10 },
+          source_refs: { type: "array", items: { type: "string", maxLength: 200 }, maxItems: 10 }, correction: { type: "string", maxLength: 5000 },
         },
         additionalProperties: false,
       };
@@ -139,11 +107,8 @@ function toolParameters(name: AutonomousToolName) {
         type: "object",
         required: ["title", "content"],
         properties: {
-          title: { type: "string", minLength: 3, maxLength: 200 },
-          content: { type: "string", minLength: 10, maxLength: 5000 },
-          category: { type: "string", maxLength: 80 },
-          severity: { type: "string", enum: ["info", "low", "medium", "high"] },
-          evidence: { type: "array", items: { type: "string", maxLength: 500 }, maxItems: 10 },
+          title: { type: "string", minLength: 3, maxLength: 200 }, content: { type: "string", minLength: 10, maxLength: 5000 }, category: { type: "string", maxLength: 80 },
+          severity: { type: "string", enum: ["info", "low", "medium", "high"] }, evidence: { type: "array", items: { type: "string", maxLength: 500 }, maxItems: 10 },
         },
         additionalProperties: false,
       };
@@ -156,14 +121,7 @@ function toolSchemas() {
   return AUTONOMOUS_TOOLS.map((name) => {
     const definition = getAgentTool(name);
     if (!definition) throw new Error(`Outil autonome absent: ${name}`);
-    return {
-      type: "function",
-      function: {
-        name: definition.name,
-        description: definition.description,
-        parameters: toolParameters(name),
-      },
-    };
+    return { type: "function", function: { name: definition.name, description: definition.description, parameters: toolParameters(name) } };
   });
 }
 
@@ -175,24 +133,11 @@ async function callBrain(messages: AgentMessage[], signal?: AbortSignal) {
   const timer = setTimeout(() => controller.abort(), Number.isFinite(timeout) ? Math.max(5000, timeout) : 120000);
   const relayAbort = () => controller.abort();
   signal?.addEventListener("abort", relayAbort, { once: true });
-
   try {
     const response = await fetch(`${config.url}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(config.key ? { Authorization: `Bearer ${config.key}` } : {}),
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages,
-        tools: toolSchemas(),
-        tool_choice: "auto",
-        parallel_tool_calls: false,
-        temperature: 0.2,
-        max_tokens: 900,
-        stream: false,
-      }),
+      headers: { "Content-Type": "application/json", ...(config.key ? { Authorization: `Bearer ${config.key}` } : {}) },
+      body: JSON.stringify({ model: config.model, messages, tools: toolSchemas(), tool_choice: "auto", parallel_tool_calls: false, temperature: 0.2, max_tokens: 900, stream: false }),
       cache: "no-store",
       signal: controller.signal,
     });
@@ -245,6 +190,44 @@ export type AutonomousAgentResult = {
   iterations: number;
 };
 
+type AgentRunRecord = { id: string };
+
+async function startRun(supabase: SupabaseClient, userId: string, objective: string, model: string) {
+  try {
+    const { data, error } = await supabase.from("agent_runs").insert({
+      user_id: userId,
+      agent: "nexora-autonomous",
+      agent_key: "nexora-autonomous",
+      model,
+      task_type: "autonomous_agent",
+      input_summary: { objective: objective.slice(0, 1000) },
+      input_context: { objective: objective.slice(0, 1000), max_context: "financial-tools-only" },
+      status: "running",
+    }).select("id").single();
+    if (error || !data) return null;
+    return data as AgentRunRecord;
+  } catch {
+    return null;
+  }
+}
+
+async function finishRun(supabase: SupabaseClient, runId: string | null, result: AutonomousAgentResult, startedAt: number) {
+  if (!runId) return;
+  try {
+    await supabase.from("agent_runs").update({
+      status: result.status,
+      model: result.model,
+      output_summary: { answer: result.answer.slice(0, 3000), steps: result.steps },
+      output: { answer: result.answer.slice(0, 5000), steps: result.steps, iterations: result.iterations },
+      duration_ms: Math.max(0, Date.now() - startedAt),
+      completed_at: new Date().toISOString(),
+      error_message: result.status === "failed" ? result.answer.slice(0, 1000) : null,
+    }).eq("id", runId).eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "");
+  } catch {
+    // Telemetry must never make the financial agent fail.
+  }
+}
+
 export async function runLocalAutonomousAgent(
   supabase: SupabaseClient,
   userId: string,
@@ -252,19 +235,27 @@ export async function runLocalAutonomousAgent(
   options?: { maxIterations?: number; signal?: AbortSignal },
 ): Promise<AutonomousAgentResult> {
   const cleanObjective = objective.trim().slice(0, 4000);
-  if (!cleanObjective) return { status: "failed", answer: "Un objectif est nécessaire pour lancer l'agent.", steps: [], model: brainConfig().model, iterations: 0 };
+  const baseModel = brainConfig().model;
+  if (!cleanObjective) return { status: "failed", answer: "Un objectif est nécessaire pour lancer l'agent.", steps: [], model: baseModel, iterations: 0 };
   const maxIterations = Math.max(1, Math.min(8, Math.floor(options?.maxIterations ?? 5)));
+  const startedAt = Date.now();
+  const run = await startRun(supabase, userId, cleanObjective, baseModel);
+  const runId = run?.id ?? null;
   const messages: AgentMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: cleanObjective },
   ];
   const steps: AutonomousAgentResult["steps"] = [];
-  let model = brainConfig().model;
+  let model = baseModel;
   const seenCalls = new Set<string>();
 
-  for (let iteration = 1; iteration <= maxIterations; iteration++) {
-    if (options?.signal?.aborted) return { status: "failed", answer: "La boucle autonome a été interrompue.", steps, model, iterations: iteration - 1 };
+  const complete = async (result: AutonomousAgentResult) => {
+    await finishRun(supabase, runId, result, startedAt);
+    return result;
+  };
 
+  for (let iteration = 1; iteration <= maxIterations; iteration++) {
+    if (options?.signal?.aborted) return complete({ status: "failed", answer: "La boucle autonome a été interrompue.", steps, model, iterations: iteration - 1 });
     let result: Awaited<ReturnType<typeof callBrain>>;
     try {
       result = await callBrain(messages, options?.signal);
@@ -273,59 +264,41 @@ export async function runLocalAutonomousAgent(
       const message = error instanceof Error && error.name === "AbortError"
         ? "Le cerveau Nexora a dépassé son délai ou la requête a été interrompue."
         : error instanceof Error ? error.message : "Le cerveau local est indisponible.";
-      return { status: "failed", answer: message, steps, model, iterations: iteration };
+      return complete({ status: "failed", answer: message, steps, model, iterations: iteration });
     }
 
     const assistant = result.message;
     const rawCalls = assistant.tool_calls ?? [];
     const toolCalls = rawCalls.map(normalizeToolCall);
     if (rawCalls.length > 0 && toolCalls.some((call) => call === null)) {
-      return { status: "blocked", answer: "Le cerveau a demandé un outil qui n'est pas autorisé par le runtime Nexora.", steps, model, iterations: iteration };
+      return complete({ status: "blocked", answer: "Le cerveau a demandé un outil qui n'est pas autorisé par le runtime Nexora.", steps, model, iterations: iteration });
     }
-
-    messages.push({
-      role: "assistant",
-      content: assistant.content ?? null,
-      ...(toolCalls.length ? { tool_calls: toolCalls as ToolCall[] } : {}),
-    });
+    messages.push({ role: "assistant", content: assistant.content ?? null, ...(toolCalls.length ? { tool_calls: toolCalls as ToolCall[] } : {}) });
 
     if (!toolCalls.length) {
-      const answer = typeof assistant.content === "string" && assistant.content.trim()
-        ? assistant.content.trim()
-        : "Objectif traité, mais le cerveau n'a pas fourni de synthèse finale.";
-      return { status: "completed", answer, steps, model, iterations: iteration };
+      const answer = typeof assistant.content === "string" && assistant.content.trim() ? assistant.content.trim() : "Objectif traité, mais le cerveau n'a pas fourni de synthèse finale.";
+      return complete({ status: "completed", answer, steps, model, iterations: iteration });
     }
 
     const toolCall = toolCalls[0] as ToolCall;
     const fingerprint = `${toolCall.function.name}:${toolCall.function.arguments || "{}"}`;
-    if (seenCalls.has(fingerprint)) {
-      return { status: "blocked", answer: "La boucle a détecté une répétition exacte d'une action et s'est arrêtée par sécurité.", steps, model, iterations: iteration };
-    }
+    if (seenCalls.has(fingerprint)) return complete({ status: "blocked", answer: "La boucle a détecté une répétition exacte d'une action et s'est arrêtée par sécurité.", steps, model, iterations: iteration });
     seenCalls.add(fingerprint);
 
     const args = safeArguments(toolCall.function.arguments);
     try {
-      const toolResult = await executeAgentTool(supabase, userId, {
-        name: toolCall.function.name,
-        arguments: args,
-      });
+      const toolResult = await executeAgentTool(supabase, userId, { name: toolCall.function.name, arguments: args }, { runId });
       steps.push({ step: iteration, tool: toolCall.function.name, ok: true, model });
       messages.push({ role: "tool", tool_call_id: toolCall.id, content: compactResult({ ok: true, result: toolResult }) });
     } catch (error) {
       steps.push({ step: iteration, tool: toolCall.function.name, ok: false, model });
       const message = error instanceof Error ? error.message : "Outil indisponible.";
       if (message.includes("validation humaine") || message.includes("human") || message.includes("Approval") || message.includes("REQUIRE_APPROVAL")) {
-        return { status: "needs_human", answer: message, steps, model, iterations: iteration };
+        return complete({ status: "needs_human", answer: message, steps, model, iterations: iteration });
       }
       messages.push({ role: "tool", tool_call_id: toolCall.id, content: compactResult({ ok: false, error: message }) });
     }
   }
 
-  return {
-    status: "blocked",
-    answer: "J'ai atteint la limite de sécurité de la boucle autonome avant de pouvoir conclure. Relance l'objectif pour continuer.",
-    steps,
-    model,
-    iterations: maxIterations,
-  };
+  return complete({ status: "blocked", answer: "J'ai atteint la limite de sécurité de la boucle autonome avant de pouvoir conclure. Relance l'objectif pour continuer.", steps, model, iterations: maxIterations });
 }
