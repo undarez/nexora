@@ -40,7 +40,13 @@ const cadenceFrom = (avg: number): RecurringCandidate["cadence"] => avg <= 10 ? 
 const addDays = (iso: string, days: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + Math.round(days)); return d.toISOString().slice(0, 10); };
 
 export function deriveTransactionIntelligence(facts: FinancialFact[]): { recurring: RecurringCandidate[]; anomalies: AnomalyCandidate[] } {
-  const expenses = facts.filter((x) => x.amount < 0).map((x) => ({ ...x, amount: Math.abs(x.amount) })).filter((x) => Number.isFinite(x.amount) && x.amount > 0);
+  const seenExpenseFingerprints = new Set<string>();
+  const expenses = facts.filter((x) => x.amount < 0).map((x) => ({ ...x, amount: Math.abs(x.amount) })).filter((x) => Number.isFinite(x.amount) && x.amount > 0).filter((x) => {
+    const fingerprint = `${x.source}|${normalize(x.label)}|${x.amount.toFixed(2)}|${x.occurredAt.slice(0, 10)}|${normalize(x.category ?? "")}`;
+    if (seenExpenseFingerprints.has(fingerprint)) return false;
+    seenExpenseFingerprints.add(fingerprint);
+    return true;
+  });
   const groups = new Map<string, FinancialFact[]>();
   for (const fact of expenses) {
     const label = normalize(fact.label);
