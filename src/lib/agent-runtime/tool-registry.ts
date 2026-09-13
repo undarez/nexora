@@ -19,6 +19,8 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
   { name: "search_skills", description: "Rechercher les skills procéduraux validés pour la tâche.", risk: "read", deterministic: true, requiresUserApproval: false },
   { name: "learn_use_case", description: "Créer un Use Case candidat à partir d’une expérience ou d’une nouvelle fonctionnalité.", risk: "recommendation", deterministic: true, requiresUserApproval: false },
   { name: "learn_skill", description: "Transformer une procédure validée ou une correction en skill candidat réutilisable.", risk: "recommendation", deterministic: true, requiresUserApproval: false },
+  { name: "create_agent_tool", description: "Créer un outil personnel gouverné composé uniquement d'outils de lecture existants.", risk: "recommendation", deterministic: true, requiresUserApproval: false },
+  { name: "research_web", description: "Rechercher des sources web publiques, récupérer quelques pages et préparer leur mémorisation.", risk: "read", deterministic: false, requiresUserApproval: false },
   { name: "create_recommendation", description: "Proposer une recommandation vérifiée ; exécution persistante soumise à validation humaine.", risk: "recommendation", deterministic: true, requiresUserApproval: true },
   { name: "save_financial_insight", description: "Enregistrer une observation financière non transactionnelle et réversible.", risk: "recommendation", deterministic: true, requiresUserApproval: false },
 ];
