@@ -74,13 +74,16 @@ async function syncLiveBanking() {
     const data = (await response.json()) as { connections?: Array<{ id: string; status: string }> };
     const connections = Array.isArray(data.connections) ? data.connections : [];
     for (const connection of connections) {
-      if (!connection.id || ["revoked", "disconnected"].includes(connection.status)) continue;
+      // Only active connections should be polled. Pending/re-auth connections
+      // must wait for the explicit banking flow instead of generating sync errors.
+      if (!connection.id || connection.status !== "active") continue;
       await fetch("/api/banking/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connectionId: connection.id }),
       });
     }
+    window.dispatchEvent(new CustomEvent("nexora-banking-updated"));
   } catch {
     // Live refresh is best-effort; the manual synchronization remains available.
   }
