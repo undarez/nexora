@@ -56,7 +56,7 @@ export async function GET() {
       accountCountByType[kind] = (accountCountByType[kind] ?? 0) + 1;
     }
 
-    return NextResponse.json({ accounts, transactions, connections: connectionsResult.data ?? [], totalsByCurrency: totals, recentFlow: { income: Number(income30.toFixed(2)), expenses: Number(expense30.toFixed(2)), net: Number((income30-income30*0+income30-expense30).toFixed(2)), currency: "EUR" }, availableByCurrency, accountCountByType, rawCredentialsExposed: false, rawProviderPayloadExposed: false }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ accounts, transactions, connections: connectionsResult.data ?? [], totalsByCurrency: totals, recentFlow: { income: Number(income30.toFixed(2)), expenses: Number(expense30.toFixed(2)), net: Number((income30-expense30).toFixed(2)), currency: "EUR" }, availableByCurrency, accountCountByType, rawCredentialsExposed: false, rawProviderPayloadExposed: false }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Vue financière indisponible." }, { status: 500 });
   }
