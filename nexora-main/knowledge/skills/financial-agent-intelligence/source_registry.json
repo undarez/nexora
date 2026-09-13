@@ -1,0 +1,314 @@
+[
+  {
+    "id": "SRC-001",
+    "title": "Agentic AI for Financial Applications: A Comprehensive Survey",
+    "publisher": "Amundi Research Center",
+    "date": "2026-08-05",
+    "authority": "B",
+    "url": "https://research-center.amundi.com/article/agentic-ai-financial-applications-comprehensive-survey",
+    "topics": [
+      "agent architecture",
+      "MCP",
+      "A2A",
+      "reasoning",
+      "RL",
+      "financial applications",
+      "hallucination",
+      "human-in-the-loop"
+    ]
+  },
+  {
+    "id": "SRC-002",
+    "title": "Agentic FinTech: A Comprehensive Survey on AI Agents in Finance in the Era of LLMs",
+    "publisher": "Yaxiong Wu; Yixuan Li / SSRN",
+    "date": "2026-02-03",
+    "authority": "B",
+    "url": "https://papers.ssrn.com/sol3/Delivery.cfm/6136529.pdf?abstractid=6136529&mirid=1&type=2",
+    "topics": [
+      "perception",
+      "risk-aware planning",
+      "tools",
+      "memory",
+      "feedback",
+      "evaluation"
+    ]
+  },
+  {
+    "id": "SRC-003",
+    "title": "AI agents for cash management in payment systems",
+    "publisher": "Bank for International Settlements",
+    "date": "2025-11-26",
+    "authority": "A",
+    "url": "https://www.bis.org/publications/working-paper-1310-ai-agents-cash-management-payment-systems",
+    "topics": [
+      "cash management",
+      "liquidity",
+      "payment prioritisation",
+      "automation",
+      "human oversight"
+    ]
+  },
+  {
+    "id": "SRC-004",
+    "title": "OWASP Top 10 for Agentic Applications for 2026",
+    "publisher": "OWASP GenAI Security Project",
+    "date": "2025-12-09",
+    "authority": "A",
+    "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+    "topics": [
+      "agent goal hijack",
+      "tool misuse",
+      "identity",
+      "supply chain",
+      "code execution",
+      "memory poisoning"
+    ]
+  },
+  {
+    "id": "SRC-005",
+    "title": "Memory Is a Feature. It Is Also an Attack Surface",
+    "publisher": "OWASP GenAI Security Project",
+    "date": "2026-05-13",
+    "authority": "A",
+    "url": "https://genai.owasp.org/2026/05/13/memory-is-a-feature-it-is-also-an-attack-surface/",
+    "topics": [
+      "memory poisoning",
+      "persistent prompt injection",
+      "memory security"
+    ]
+  },
+  {
+    "id": "SRC-006",
+    "title": "EBA, EIOPA and ESMA statement on frontier AI models",
+    "publisher": "European Supervisory Authorities",
+    "date": "2026-07-31",
+    "authority": "A",
+    "url": "https://www.eba.europa.eu/publications-and-media/press-releases/eba-eiopa-and-esma-call-enhanced-governance-and-consistent-supervision-mitigate-ict-risks-frontier",
+    "topics": [
+      "governance",
+      "ICT risk",
+      "cyber risk",
+      "operational resilience",
+      "DORA"
+    ]
+  },
+  {
+    "id": "SRC-007",
+    "title": "Profilage et décision entièrement automatisée",
+    "publisher": "CNIL",
+    "date": "2026",
+    "authority": "A",
+    "url": "https://www.cnil.fr/fr/profilage-et-decision-entierement-automatisee",
+    "topics": [
+      "GDPR",
+      "Article 22",
+      "profiling",
+      "automated decisions",
+      "human intervention"
+    ]
+  },
+  {
+    "id": "SRC-008",
+    "title": "Building Effective AI Agents",
+    "publisher": "Anthropic",
+    "date": "2024",
+    "authority": "C",
+    "url": "https://resources.anthropic.com/building-effective-ai-agents",
+    "topics": [
+      "workflows",
+      "single agent",
+      "multi agent",
+      "orchestration",
+      "evaluation"
+    ]
+  },
+  {
+    "id": "SRC-009",
+    "title": "Building Effective AI Agents",
+    "publisher": "Anthropic",
+    "date": "2024-12-19",
+    "authority": "C",
+    "url": "https://www.anthropic.com/research/building-effective-agents",
+    "topics": [
+      "augmented LLM",
+      "workflows",
+      "routing",
+      "parallelization",
+      "orchestrator-workers",
+      "evaluator-optimizer",
+      "MCP",
+      "memory"
+    ]
+  },
+  {
+    "id": "SRC-010",
+    "title": "New tools for building agents",
+    "publisher": "OpenAI",
+    "date": "2025-03-11",
+    "authority": "C",
+    "url": "https://openai.com/index/new-tools-for-building-agents/",
+    "topics": [
+      "Agents SDK",
+      "handoffs",
+      "guardrails",
+      "tracing",
+      "observability",
+      "tools"
+    ]
+  },
+  {
+    "id": "SRC-011",
+    "title": "The next evolution of the Agents SDK",
+    "publisher": "OpenAI",
+    "date": "2026-04-15",
+    "authority": "C",
+    "url": "https://openai.com/index/the-next-evolution-of-the-agents-sdk/",
+    "topics": [
+      "sandbox",
+      "memory",
+      "tools",
+      "long-horizon tasks",
+      "isolation",
+      "durable execution"
+    ]
+  },
+  {
+    "id": "SRC-012",
+    "title": "A practical guide to building agents",
+    "publisher": "OpenAI",
+    "date": "2026",
+    "authority": "C",
+    "url": "https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/",
+    "topics": [
+      "handoffs",
+      "decentralized agents",
+      "guardrails",
+      "risk ratings",
+      "human escalation"
+    ]
+  },
+  {
+    "id": "SRC-013",
+    "title": "Model Context Protocol Specification 2025-11-25",
+    "publisher": "Model Context Protocol",
+    "date": "2025-11-25",
+    "authority": "C",
+    "url": "https://modelcontextprotocol.io/specification/2025-11-25",
+    "topics": [
+      "tool safety",
+      "consent",
+      "data privacy",
+      "authorization",
+      "resource indicators"
+    ]
+  },
+  {
+    "id": "SRC-014",
+    "title": "MCP Authorization Specification 2025-11-25",
+    "publisher": "Model Context Protocol",
+    "date": "2025-11-25",
+    "authority": "C",
+    "url": "https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization",
+    "topics": [
+      "OAuth 2.1",
+      "PKCE",
+      "token audience",
+      "least privilege",
+      "token passthrough"
+    ]
+  },
+  {
+    "id": "SRC-015",
+    "title": "AI agents for cash management in payment systems",
+    "publisher": "Bank for International Settlements",
+    "date": "2025-11-26",
+    "authority": "A",
+    "url": "https://www.bis.org/publications/working-paper-1310-ai-agents-cash-management-payment-systems",
+    "topics": [
+      "liquidity buffers",
+      "payment prioritisation",
+      "liquidity constraints",
+      "uncertainty",
+      "human oversight"
+    ]
+  },
+  {
+    "id": "SRC-016",
+    "title": "OWASP Top 10 for Agentic Applications for 2026",
+    "publisher": "OWASP GenAI Security Project",
+    "date": "2025-12-09",
+    "authority": "A",
+    "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+    "topics": [
+      "goal hijack",
+      "tool misuse",
+      "identity abuse",
+      "supply chain",
+      "code execution",
+      "memory poisoning"
+    ]
+  },
+  {
+    "id": "SRC-017",
+    "title": "EBA/EIOPA/ESMA statement on frontier AI models",
+    "publisher": "European Supervisory Authorities",
+    "date": "2026-07-31",
+    "authority": "A",
+    "url": "https://www.eba.europa.eu/publications-and-media/press-releases/eba-eiopa-and-esma-call-enhanced-governance-and-consistent-supervision-mitigate-ict-risks-frontier",
+    "topics": [
+      "governance",
+      "risk management",
+      "cyber risk",
+      "operational resilience",
+      "DORA"
+    ]
+  },
+  {
+    "id": "SRC-018",
+    "title": "DORA Regulation (EU) 2022/2554",
+    "publisher": "European Union / EUR-Lex",
+    "date": "2022-12-14",
+    "authority": "A",
+    "url": "https://eur-lex.europa.eu/legal-content/FR-EN/TXT/?uri=CELEX%3A32022R2554",
+    "topics": [
+      "ICT risk",
+      "governance",
+      "operational resilience",
+      "third-party risk",
+      "security",
+      "audit"
+    ]
+  },
+  {
+    "id": "SRC-019",
+    "title": "Profilage et décision entièrement automatisée",
+    "publisher": "CNIL",
+    "date": "2026",
+    "authority": "A",
+    "url": "https://www.cnil.fr/fr/profilage-et-decision-entierement-automatisee",
+    "topics": [
+      "GDPR",
+      "Article 22",
+      "profiling",
+      "automated decisions",
+      "human intervention"
+    ]
+  },
+  {
+    "id": "SRC-020",
+    "title": "Agentic FinTech: A Comprehensive Survey on AI Agents in Finance in the Era of LLMs",
+    "publisher": "University of Glasgow / SSRN",
+    "date": "2026-02-03",
+    "authority": "B",
+    "url": "https://papers.ssrn.com/sol3/Delivery.cfm/6136529.pdf?abstractid=6136529&mirid=1&type=2",
+    "topics": [
+      "perception",
+      "planning",
+      "memory",
+      "tool use",
+      "feedback",
+      "evaluation",
+      "financial agents"
+    ]
+  }
+]

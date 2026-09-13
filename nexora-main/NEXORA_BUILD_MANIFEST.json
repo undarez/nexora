@@ -1,0 +1,21 @@
+{
+  "project": "Nexora",
+  "purpose": "Archive de travail consolidée",
+  "includes": [
+    "Agent Harness",
+    "Nexo autonomous agent v4",
+    "Letta adapter (disabled by default)",
+    "Static governed skill catalog",
+    "Hume voice gateway and UI",
+    "Supabase reconciliation migrations present in repository",
+    "Web research / SSRF protections",
+    "Autonomous tool safeguards",
+    "Documentation and regression scripts",
+    "Month-aware orchestration correction"
+  ],
+  "standby": [
+    "Letta runtime integration disabled by default",
+    "ElevenLabs not enabled"
+  ],
+  "note": "Les changements Supabase déjà appliqués au projet distant ne sont pas une copie de la base distante ; les migrations/reconciliation scripts présents dans le repo documentent et reproduisent les changements de schéma."
+}

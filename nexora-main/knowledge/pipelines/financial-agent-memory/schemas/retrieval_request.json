@@ -1,0 +1,13 @@
+{
+  "query": "string",
+  "domain": "financial_agents",
+  "agent_run_id": "uuid|null",
+  "top_k": 8,
+  "min_confidence": 0.65,
+  "authorities": [
+    "A",
+    "B",
+    "C"
+  ],
+  "include_proposed": false
+}

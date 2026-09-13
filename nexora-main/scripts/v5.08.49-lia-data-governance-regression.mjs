@@ -1,0 +1,26 @@
+import fs from 'node:fs';
+const read = (f) => fs.readFileSync(f,'utf8');
+const exists = (f) => fs.existsSync(f);
+const checks=[]; const ok=(n,c)=>checks.push([n,!!c]);
+const gov=read('src/lib/lia/data-governance.ts');
+const gateway=read('src/lib/lia/financial-data-gateway.ts');
+const app=read('src/lib/lia/application-context.ts');
+const mig=read('supabase/migrations/0103_lia_data_governance.sql');
+const pkg=JSON.parse(read('package.json'));
+ok('package version remains compatible',typeof pkg.version==='string' && pkg.version.localeCompare('0.1.99', undefined, {numeric:true})>=0);
+ok('governance module exists',exists('src/lib/lia/data-governance.ts'));
+ok('sensitive fields server-only',gov.includes('"sensitive", "server_only"') && gov.includes('access_token'));
+ok('financial identifiers server-only',gov.includes('"financial", "server_only"') && gov.includes('iban'));
+ok('payload minimization integrated',gateway.includes('governLiaPayload(output)'));
+ok('depth limit',gov.includes('DEPTH_LIMIT'));
+ok('string redaction',gov.includes('IBAN_REDACTED') && gov.includes('NUMBER_REDACTED'));
+ok('application context exposes policy metadata',app.includes('data_governance: LIA_DATA_GOVERNANCE'));
+ok('mail remains signal',gov.includes('"mail_metadata", "model_allowed"'));
+ok('memory has no authority',gov.includes('La mémoire ne constitue ni une donnée financière de référence ni une autorisation.'));
+ok('registry migration exists',exists('supabase/migrations/0103_lia_data_governance.sql'));
+ok('rls enabled',mig.includes('enable row level security'));
+ok('no public grants',mig.includes('revoke all on public.lia_data_governance_policies from anon, authenticated'));
+ok('retention registry',mig.includes('retention_policy'));
+ok('regression registered',pkg.scripts['lia:data-governance']==='node scripts/v5.08.49-lia-data-governance-regression.mjs');
+let pass=0; for(const [n,c] of checks){console.log(`${c?'PASS':'FAIL'} ${n}`);if(c)pass++;}
+console.log(`V5.08.49: ${pass}/${checks.length} PASS`); if(pass!==checks.length)process.exit(1);

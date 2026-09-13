@@ -1,0 +1,7 @@
+# Decision gate
+
+RETRIEVE -> REASON -> RISK CLASSIFY -> AUTHORIZATION CHECK -> POLICY CHECK -> EVIDENCE CHECK -> DECISION GATE -> TOOL -> EVIDENCE -> OUTCOME -> EVALUATION
+
+Outcomes: ALLOW / ALLOW_WITH_GUARDRAIL / REQUIRE_APPROVAL / ESCALATE / BLOCK.
+
+Knowledge can inform the gate but cannot authorize an action.

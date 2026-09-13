@@ -1,0 +1,27 @@
+{
+  "knowledge_id": "uuid",
+  "knowledge_type": "concept|claim|practice|risk|control|capability|policy_candidate|evaluation_rule",
+  "domain": "string",
+  "title": "string",
+  "statement": "string",
+  "source_ids": [
+    "string"
+  ],
+  "evidence": [
+    {
+      "source_id": "string",
+      "location": "string",
+      "quote_or_excerpt": "string"
+    }
+  ],
+  "authority": "A|B|C|D|E",
+  "confidence": 0.0,
+  "status": "proposed|validated|deprecated|conflicted",
+  "effective_date": "date|null",
+  "review_date": "date|null",
+  "tags": [
+    "string"
+  ],
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}

@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const root = new URL('..', import.meta.url).pathname;
+const gateway = fs.readFileSync(new URL('../src/lib/lia/financial-data-gateway.ts', import.meta.url), 'utf8');
+const route = fs.readFileSync(new URL('../src/app/api/lia/financial-context/route.ts', import.meta.url), 'utf8');
+const executor = fs.readFileSync(new URL('../src/lib/agent-runtime/executor.ts', import.meta.url), 'utf8');
+for (const token of ['raw_data_exposed: false','raw_vault_payload_never_exposed','raw_transaction_labels_never_exposed','projection_grants_no_authority']) if (!gateway.includes(token)) throw new Error(`Missing gateway invariant: ${token}`);
+if (!route.includes('buildLiaFinancialProjection')) throw new Error('Financial context route is not using the gateway');
+if (!executor.includes('buildLiaFinancialProjection')) throw new Error('get_financial_snapshot is not using the gateway');
+if (!executor.includes('vault_payload_exposed: false')) throw new Error('Snapshot does not declare vault isolation');
+console.log('lia:financial-data-gateway PASS');
