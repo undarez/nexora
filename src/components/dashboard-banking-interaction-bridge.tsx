@@ -4,6 +4,17 @@ import { useEffect } from "react";
 
 const PERIOD_DAYS: Record<string, number> = { "1J": 1, "1S": 7, "1M": 30, "3M": 90, "1A": 365, "TOUT": 1825 };
 
+function setActivePeriod(node: HTMLElement) {
+  document.querySelectorAll(".nexora-periods span, .nexora-periods b").forEach((item) => {
+    if (!(item instanceof HTMLElement)) return;
+    item.style.background = "transparent";
+    item.style.color = "rgba(255,255,255,.6)";
+  });
+  node.style.background = "#7552f0";
+  node.style.color = "#fff";
+  node.style.borderRadius = "7px";
+}
+
 function drawHistory(points: Array<{ date: string; eur: number }>) {
   const svg = document.querySelector(".nexora-line-chart svg");
   if (!(svg instanceof SVGElement)) return;
@@ -69,9 +80,11 @@ export function DashboardBankingInteractionBridge() {
         node.setAttribute("role", "button");
         node.setAttribute("tabindex", "0");
         node.style.cursor = "pointer";
+        node.style.position = "relative";
+        node.style.zIndex = "30";
+        node.style.pointerEvents = "auto";
         node.addEventListener("click", () => {
-          document.querySelectorAll(".nexora-periods span, .nexora-periods b").forEach((item) => item.classList.remove("active"));
-          node.classList.add("active");
+          setActivePeriod(node);
           void loadPeriod(label);
         });
         node.addEventListener("keydown", (event) => {
