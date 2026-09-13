@@ -3,7 +3,7 @@ export type NexoraBrainMessage = {
   content: string;
 };
 
-export type NexoraBrainProvider = "native" | "llama_cpp" | "ollama" | "remote" | "deterministic";
+export type NexoraBrainProvider = "native" | "ollama" | "remote" | "deterministic";
 
 export type NexoraBrainMode =
   | "native_first"
