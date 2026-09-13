@@ -4,6 +4,7 @@ import { NexoAssistant } from "@/components/nexo/nexo-assistant";
 import { NexoLiveObserver } from "@/components/nexo/nexo-live-observer";
 import { NexoUsageObserver } from "@/components/nexo/nexo-usage-observer";
 import { NexoInteractionObserver } from "@/components/nexo/nexo-interaction-observer";
+import { NexoVoiceButton } from "@/components/nexo/nexo-voice-button";
 import { AndroidInteractionLayer } from "@/components/mobile/android-interaction-layer";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { MinimumRouteLoader } from "@/components/minimum-route-loader";
@@ -18,5 +19,5 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth?reason=auth_required");
   const isAdmin = (process.env.ADMIN_EMAILS || "").split(",").map((v) => v.trim().toLowerCase()).includes((user.email || "").toLowerCase());
-  return <div className="protected-app-shell"><LiaRuntimeBootstrap /><ProductAnalyticsTracker /><DesktopSidebar isAdmin={isAdmin} /><div className="desktop-main"><AppTopbar displayName={(user.user_metadata?.display_name as string | undefined) ?? null} email={user.email} /><div className="route-transition"><MinimumRouteLoader>{children}</MinimumRouteLoader></div></div><NexoAssistant /><NexoLiveObserver /><NexoUsageObserver /><NexoInteractionObserver /><FirstVisitGuide userId={user.id} /><AndroidInteractionLayer /></div>;
+  return <div className="protected-app-shell"><LiaRuntimeBootstrap /><ProductAnalyticsTracker /><DesktopSidebar isAdmin={isAdmin} /><div className="desktop-main"><AppTopbar displayName={(user.user_metadata?.display_name as string | undefined) ?? null} email={user.email} /><div className="route-transition"><MinimumRouteLoader>{children}</MinimumRouteLoader></div></div><NexoAssistant /><NexoLiveObserver /><NexoUsageObserver /><NexoInteractionObserver /><NexoVoiceButton /><FirstVisitGuide userId={user.id} /><AndroidInteractionLayer /></div>;
 }
