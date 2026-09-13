@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { buildLiaFinancialCopilot } from "@/lib/lia/financial-copilot";
 import { createClient } from "@/lib/supabase/server";
 import { assertSameOrigin } from "@/lib/security/csrf";
-import { runNexoraAutonomousAgent } from "@/lib/lia/autonomous-agent-v3";
+import { runNexoraAutonomousAgent } from "@/lib/lia/autonomous-agent-v4";
 import { buildCopilotObjective, getNexoraPageContext } from "@/lib/lia/copilot-context";
 import { interactionSummaryPrompt } from "@/lib/lia/interaction-intelligence";
 
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const message = typeof body.message === "string" && body.message.trim() ? body.message.trim().slice(0, 1800) : undefined;
     const ctx = getNexoraPageContext(path);
     const interactions = await recentInteractionContext(supabase, user.id);
-    const interactionObjective = interactions ? `\n\nContexte comportemental explicite et minimal des 15 dernières minutes (données de télémétrie, jamais du DOM) :\n${interactions}\nUtilise uniquement ces événements comme indices faibles. Ne déduis jamais une intention sensible et ne cite pas les identifiants techniques. Si la séquence ne justifie pas une observation utile, réponds exactement NO_PROACTIVE_SIGNAL.` : "";
+    const interactionObjective = interactions ? `\n\nContexte comportemental explicite et minimal des 15 dernières minutes (télémétrie, jamais du DOM) :\n${interactions}\nUtilise uniquement ces événements comme indices faibles. Ne déduis jamais une intention sensible et ne cite pas les identifiants techniques. Si la séquence ne justifie pas une observation utile, réponds exactement NO_PROACTIVE_SIGNAL.` : "";
     const objective = `${buildCopilotObjective(ctx, message)}${interactionObjective}`;
     const result = await runNexoraAutonomousAgent(supabase, user.id, objective, { maxIterations: message ? 6 : 4 });
     return NextResponse.json({ ...result, page: ctx.page, section: ctx.section, proactive: !message });
