@@ -5,6 +5,7 @@ import { Footer } from "@/components/footer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { DashboardBankingInteractionBridge } from "@/components/dashboard-banking-interaction-bridge";
 import { BankAccountDeduplicationManager } from "@/components/bank-account-deduplication-manager";
+import { MonthlyTransactionsBridge } from "@/components/finance/monthly-transactions-bridge";
 
 export const metadata: Metadata = {
   title: "Nexora",
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="protected-app-shell">{children}</div>
           <DashboardBankingInteractionBridge />
           <BankAccountDeduplicationManager />
+          <MonthlyTransactionsBridge />
           <Footer />
         </ThemeProvider>
       </body>
