@@ -88,8 +88,7 @@ export async function liaChat(messages: LiaProviderMessage[], signal?: AbortSign
   if (config.mode === "native_first" || config.mode === "native_only") {
     if (config.native.configured) {
       try {
-        const result = await nexoraBrainChat(messages, signal);
-        return { ...result, provider: result.provider === "llama_cpp" ? "native" : result.provider };
+        return await nexoraBrainChat(messages, signal);
       } catch (error) {
         errors.push(error instanceof Error ? error.message : "NEXORA Brain indisponible.");
         if (config.mode === "native_only") return { content: deterministicFallback([...messages].reverse().find(m => m.role === "user")?.content || ""), model: "deterministic-fallback", provider: "deterministic" };
