@@ -18,22 +18,24 @@ export type LiaSkillExecutionContext = {
   permissions: readonly LiaPermission[];
 };
 
-const registry = new Map<string, ExecutableLiaSkill>();
+// Runtime registry intentionally erases individual skill input/output types.
+// Each registered skill retains its own generic contract at execution time.
+const registry = new Map<string, ExecutableLiaSkill<any, any>>();
 
 export function registerExecutableLiaSkill<TInput, TOutput>(skill: ExecutableLiaSkill<TInput, TOutput>): void {
   if (registry.has(skill.id)) throw new Error(`Skill déjà enregistré : ${skill.id}`);
-  registry.set(skill.id, skill as ExecutableLiaSkill);
+  registry.set(skill.id, skill);
 }
 
-export function getExecutableLiaSkill(id: string): ExecutableLiaSkill | null {
+export function getExecutableLiaSkill(id: string): ExecutableLiaSkill<any, any> | null {
   return registry.get(id) ?? null;
 }
 
-export function listExecutableLiaSkills(): ExecutableLiaSkill[] {
+export function listExecutableLiaSkills(): ExecutableLiaSkill<any, any>[] {
   return [...registry.values()];
 }
 
-export function canExecuteLiaSkill(skill: ExecutableLiaSkill, permissions: readonly LiaPermission[]): boolean {
+export function canExecuteLiaSkill(skill: ExecutableLiaSkill<any, any>, permissions: readonly LiaPermission[]): boolean {
   return skill.requiredPermissions.every(permission => permissions.includes(permission));
 }
 
