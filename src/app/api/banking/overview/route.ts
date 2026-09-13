@@ -10,7 +10,6 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
 
-    // Toujours demander une synchronisation fraîche avant de calculer le solde affiché.
     const { data: activeConnections, error: connectionSyncLookupError } = await supabase
       .from("bank_connections")
       .select("id,status")
@@ -26,8 +25,17 @@ export async function GET() {
     }
 
     const [accountsResult, transactionsResult, connectionsResult] = await Promise.all([
-      supabase.from("bank_accounts").select("id,connection_id,name,account_type,iban_masked,currency,balance,available_balance,last_synced_at,provider").eq("user_id", user.id).order("created_at", { ascending: true }),
-      supabase.from("bank_transactions").select("id,account_id,booked_at,value_date,description,merchant_name,amount,currency,category,pending").eq("user_id", user.id).order("booked_at", { ascending: false }).order("created_at", { ascending: false }).limit(50),
+      supabase.from("bank_accounts")
+        .select("id,connection_id,name,account_type,iban_masked,currency,balance,available_balance,last_synced_at,provider,status")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: true }),
+      supabase.from("bank_transactions")
+        .select("id,account_id,external_transaction_id,provider,booked_at,value_date,description,merchant_name,amount,currency,category,pending")
+        .eq("user_id", user.id)
+        .order("booked_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(100),
       supabase.from("bank_connections").select("id,provider,status,institution_name,institution_logo_url,last_synced_at,consent_expires_at").eq("user_id", user.id),
     ]);
     if (accountsResult.error) throw accountsResult.error;
@@ -35,14 +43,28 @@ export async function GET() {
     if (connectionsResult.error) throw connectionsResult.error;
 
     const accounts = accountsResult.data ?? [];
-    const transactions = transactionsResult.data ?? [];
+    const activeAccountIds = new Set(accounts.map((account) => String(account.id)));
+
+    // Une transaction appartenant à un compte désactivé est volontairement exclue :
+    // elle provient d'une occurrence bancaire reconnue comme doublon.
+    const transactions = (transactionsResult.data ?? []).filter((transaction) => activeAccountIds.has(String(transaction.account_id)));
+    const seenTransactions = new Set<string>();
+    const deduplicatedTransactions = transactions.filter((transaction) => {
+      const externalId = String(transaction.external_transaction_id ?? "");
+      if (!externalId) return true;
+      const key = `${String(transaction.provider ?? "")}|${externalId}`;
+      if (seenTransactions.has(key)) return false;
+      seenTransactions.add(key);
+      return true;
+    }).slice(0, 50);
+
     const byCurrency: Record<string, number> = {};
     for (const account of accounts) {
       const currency = String(account.currency || "EUR").toUpperCase();
       byCurrency[currency] = Number((byCurrency[currency] ?? 0) + Number(account.balance ?? 0));
     }
     const totals = Object.fromEntries(Object.entries(byCurrency).map(([currency, value]) => [currency, Number(value.toFixed(2))]));
-    const eurTransactions = transactions.filter(t => String(t.currency || "EUR").toUpperCase() === "EUR");
+    const eurTransactions = deduplicatedTransactions.filter(t => String(t.currency || "EUR").toUpperCase() === "EUR");
     const expense30 = eurTransactions.filter(t => Number(t.amount) < 0).reduce((sum,t)=>sum+Math.abs(Number(t.amount)),0);
     const income30 = eurTransactions.filter(t => Number(t.amount) > 0).reduce((sum,t)=>sum+Number(t.amount),0);
     const availableByCurrency: Record<string, number> = {};
@@ -56,7 +78,7 @@ export async function GET() {
       accountCountByType[kind] = (accountCountByType[kind] ?? 0) + 1;
     }
 
-    return NextResponse.json({ accounts, transactions, connections: connectionsResult.data ?? [], totalsByCurrency: totals, recentFlow: { income: Number(income30.toFixed(2)), expenses: Number(expense30.toFixed(2)), net: Number((income30-expense30).toFixed(2)), currency: "EUR" }, availableByCurrency, accountCountByType, rawCredentialsExposed: false, rawProviderPayloadExposed: false }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ accounts, transactions: deduplicatedTransactions, connections: connectionsResult.data ?? [], totalsByCurrency: totals, recentFlow: { income: Number(income30.toFixed(2)), expenses: Number(expense30.toFixed(2)), net: Number((income30-expense30).toFixed(2)), currency: "EUR" }, availableByCurrency, accountCountByType, rawCredentialsExposed: false, rawProviderPayloadExposed: false }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Vue financière indisponible." }, { status: 500 });
   }
