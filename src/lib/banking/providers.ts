@@ -1,6 +1,6 @@
 import { registerBankingProvider } from "./provider-registry";
 import { powensAdapter } from "./powens-adapter";
 
-if (process.env.POWENS_DOMAIN && process.env.POWENS_CLIENT_ID && process.env.POWENS_CLIENT_SECRET) {
-  registerBankingProvider(powensAdapter);
-}
+// Keep Powens visible in the banking UI even before server credentials are configured.
+// The adapter validates credentials when a connection is actually requested.
+registerBankingProvider(powensAdapter);
