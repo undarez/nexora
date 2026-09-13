@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
 
     const params = new URL(request.url).searchParams;
-    const days = Math.min(Math.max(Number(params.get("days") ?? 90), 7), 365);
+    const days = Math.min(Math.max(Number(params.get("days") ?? 90), 1), 1825);
     const since = new Date(Date.now() - days * 86400000).toISOString();
     const { data, error } = await supabase
       .from("bank_balance_snapshots")
