@@ -12,15 +12,36 @@ const money = (n: number) => new Intl.NumberFormat("fr-FR", { style: "currency",
 
 export function FinancialCrossDomainSummary({ month, context }: { month?: string; context?: Context | null }) {
   const [data, setData] = useState<Context | null>(context ?? null);
+
   useEffect(() => {
     if (context !== undefined) { setData(context ?? null); return; }
     let cancelled = false;
     const query = month ? `?month=${encodeURIComponent(month)}` : "";
-    fetch(`/api/finance/unified-context${query}`, { cache: "no-store" })
-      .then(async r => r.ok ? r.json() : null)
-      .then(v => { if (!cancelled) setData(v); })
-      .catch(() => { if (!cancelled) setData(null); });
-    return () => { cancelled = true; };
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/finance/unified-context${query}`, { cache: "no-store" });
+        const value = response.ok ? await response.json() as Context : null;
+        if (!cancelled) setData(value);
+      } catch {
+        if (!cancelled) setData(null);
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => { void load(); }, 60_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [month, context]);
+
+  useEffect(() => {
+    if (context !== undefined) return;
+    const onBankingUpdate = () => {
+      const query = month ? `?month=${encodeURIComponent(month)}` : "";
+      void fetch(`/api/finance/unified-context${query}`, { cache: "no-store" })
+        .then(async r => r.ok ? await r.json() as Context : null)
+        .then(v => { if (v) setData(v); })
+        .catch(() => undefined);
+    };
+    window.addEventListener("nexora-banking-updated", onBankingUpdate);
+    return () => window.removeEventListener("nexora-banking-updated", onBankingUpdate);
   }, [month, context]);
 
   if (!data) return null;
