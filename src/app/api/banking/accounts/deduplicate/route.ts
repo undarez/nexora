@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { assertSameOrigin } from "@/lib/security/csrf";
 
 export async function POST(request: Request) {
+  try {
+    assertSameOrigin(request);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Requête cross-origin refusée." }, { status: 403 });
+  }
+
   try {
     const supabase = await createClient();
     if (!supabase) return NextResponse.json({ error: "Supabase indisponible." }, { status: 503 });
