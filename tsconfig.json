@@ -38,7 +38,8 @@
   ],
   "exclude": [
     "node_modules",
-    "knowledge/pipelines/**/supabase/functions/**",
+    "**/supabase/functions/**",
+    "hermes-20-sauvegarde/**",
     "work/**"
   ]
 }
