@@ -6,32 +6,92 @@ Faire fonctionner un petit LLM local sur un PC gamer courant, tout en conservant
 
 Le modèle n'est pas l'agent. Le modèle raisonne et choisit des outils ; NEXORA garde l'identité utilisateur, les permissions, les données financières et l'autorité d'exécution.
 
-## Architecture
+## Architecture agentique actuelle
 
 ```text
 Utilisateur
    |
    v
-Next.js /api/lia/autonomous-agent
+Nexo / Next.js
    |
-   +--> boucle bornée (1 outil à la fois, 8 itérations max)
+   +--> Agent Harness / Governor
+   |      +--> budget étapes / outils / temps
+   |      +--> détection de répétition
+   |      +--> trajectoire auditable
+   |      +--> arrêt sécurisé
    |
    +--> NEXORA Brain (OpenAI-compatible)
-   |       |
-   |       +--> llama.cpp / llama-server
-   |       +--> GGUF local
+   |      +--> llama.cpp / llama-server / autre runtime compatible
    |
-   +--> executeAgentTool()
-           |
-           +--> Policy Engine Supabase
-           +--> outils financiers en lecture
-           +--> mémoire / skills / use cases
-           +--> blocage des actions sensibles
+   +--> Letta (optionnel, self-hosted)
+   |      +--> mémoire persistante par utilisateur
+   |      +--> contexte auxiliaire non autoritatif
+   |
+   +--> Skill Registry gouverné
+   |      +--> finance / agentic / interaction / security / knowledge / voice
+   |
+   +--> Tool Registry
+          |
+          +--> Policy Engine Supabase
+          +--> outils financiers
+          +--> recherche web bornée
+          +--> outils dynamiques read-only
+          +--> Human Gate pour écritures sensibles
+
+Nexo Voice Gateway
+   +--> Hume Octave / EVI
+   +--> ElevenLabs
 ```
 
-## Modèle de départ
+## Harness
 
-Profil minimal recommandé : **Qwen3.5 4B Q4_K_M**. Un GGUF Q4_K_M est d'environ 2.7 Go et peut être servi directement avec llama.cpp. Pour une machine plus musclée, remplacer uniquement le modèle par une quantification 5/6/8 bits ou un 9B.
+`src/lib/lia/agent-harness.ts` est le gouverneur d'exécution. Il ne remplace pas le Policy Engine : il ajoute une couche indépendante de limites et de contrôle de trajectoire.
+
+Limites configurables :
+
+```env
+NEXORA_HARNESS_MAX_STEPS=12
+NEXORA_HARNESS_MAX_TOOL_CALLS=10
+NEXORA_HARNESS_MAX_WALL_MS=180000
+NEXORA_HARNESS_MAX_REPEATED_CALLS=1
+```
+
+## Mémoire persistante Letta
+
+Letta est optionnel et doit être activé explicitement. Le serveur Letta peut être auto-hébergé ; NEXORA ne lui délègue jamais les permissions financières.
+
+```env
+LETTA_ENABLED=false
+LETTA_BASE_URL=http://127.0.0.1:8283
+LETTA_API_KEY=
+LETTA_MODEL=
+```
+
+Une identité Letta est liée à un seul utilisateur via `lia_memory_agents`. La mémoire ne doit contenir que du contexte utile ; les montants, soldes et autres faits financiers doivent être revérifiés dans Supabase via les outils autorisés.
+
+## Skills
+
+Le catalogue statique `src/lib/lia/skill-registry.ts` décrit les compétences disponibles à Nexo. Les compétences ne donnent aucune permission supplémentaire : elles orientent la sélection de capacités, tandis que l'exécuteur et la Policy Engine restent l'autorité.
+
+Le registre couvre notamment : budget, cashflow, anomalies, récurrences, prévisions, scénarios, épargne, patrimoine, objectifs, risques, planification agentique, vérification, recherche web, fiabilité des sources, contradictions, contexte de page, friction, prompt injection, isolation des données, SSRF et voix.
+
+Le registre persistant `src/lib/lia/skills/registry.ts` reste utilisé pour les skills appris et leur sélection contextuelle.
+
+## Voix
+
+Le Voice Gateway est serveur uniquement. Les clés ne sont jamais envoyées au navigateur.
+
+```env
+NEXORA_VOICE_PROVIDER=hume
+HUME_API_KEY=
+HUME_VOICE_ID=
+HUME_VOICE_NAME=
+ELEVENLABS_API_KEY=
+ELEVENLABS_VOICE_ID=
+ELEVENLABS_MODEL=eleven_multilingual_v2
+```
+
+L'API exposée à l'application est `POST /api/lia/voice/synthesize`. Hume est le fournisseur par défaut ; ElevenLabs peut être sélectionné explicitement.
 
 ## Windows
 
@@ -71,16 +131,34 @@ Payload minimal :
 }
 ```
 
-La boucle ne donne au modèle que des outils autorisés. Les outils d'écriture sensible restent bloqués par `executeAgentTool()` et par le Policy Engine Supabase.
+Le copilote global utilise désormais le runtime agentique v4 avec le harness et, lorsqu'il est activé, la mémoire Letta.
 
-## Ce que signifie « autonome » ici
+## Tests
+
+Régression minimale du harness :
+
+```powershell
+npm run lia:agent-harness
+```
+
+Puis, avant déploiement :
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+## Ce que signifie « autonome »
 
 - planification locale par LLM ;
 - sélection dynamique d'outils ;
 - observation des résultats ;
 - réévaluation après chaque étape ;
-- mémoire et apprentissage procédural via les systèmes LIA existants ;
-- arrêt automatique après un budget d'itérations ;
-- arrêt avec `needs_human` lorsqu'une autorisation humaine est nécessaire.
+- mémoire persistante optionnelle ;
+- skills gouvernés et réutilisables ;
+- recherche web bornée et non fiable ;
+- arrêt automatique par budget ;
+- trajectoire enregistrable et contrôlable ;
+- `needs_human` pour les opérations nécessitant une autorisation humaine.
 
-Ce n'est volontairement pas un LLM entraîné depuis zéro. Les poids sont ceux d'un modèle open-weight et l'autonomie vient de la couche agentique, de la mémoire, des outils, de la politique d'autorisation et de la boucle d'exécution.
+Ce n'est volontairement pas un LLM entraîné depuis zéro. Les poids restent ceux du modèle d'inférence ; l'autonomie vient de la couche agentique, de la mémoire, des skills, des outils, de la politique d'autorisation, des évaluations et de la boucle d'exécution.
