@@ -67,6 +67,25 @@ async function connectPowens() {
   }
 }
 
+async function syncLiveBanking() {
+  try {
+    const response = await fetch("/api/banking/connections", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = (await response.json()) as { connections?: Array<{ id: string; status: string }> };
+    const connections = Array.isArray(data.connections) ? data.connections : [];
+    for (const connection of connections) {
+      if (!connection.id || ["revoked", "disconnected"].includes(connection.status)) continue;
+      await fetch("/api/banking/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId: connection.id }),
+      });
+    }
+  } catch {
+    // Live refresh is best-effort; the manual synchronization remains available.
+  }
+}
+
 export function DashboardBankingInteractionBridge() {
   useEffect(() => {
     let disposed = false;
@@ -116,16 +135,19 @@ export function DashboardBankingInteractionBridge() {
     };
 
     bind();
+    void syncLiveBanking();
     document.addEventListener("pointerdown", onPointerDown, true);
     const observer = new MutationObserver(bind);
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["disabled"] });
     const timer = window.setInterval(bind, 500);
+    const liveSyncTimer = window.setInterval(() => { void syncLiveBanking(); }, 60_000);
 
     return () => {
       disposed = true;
       document.removeEventListener("pointerdown", onPointerDown, true);
       observer.disconnect();
       window.clearInterval(timer);
+      window.clearInterval(liveSyncTimer);
     };
   }, []);
 
