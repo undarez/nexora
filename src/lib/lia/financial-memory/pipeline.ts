@@ -30,6 +30,7 @@ export type FinancialHabit = {
 
 export type LiaBrainContext = {
   skill: SkillHit | null;
+  skills: SkillHit[];
   memories: LiaMemoryContext[];
   knowledge: FinancialKnowledgeHit[];
   habits: FinancialHabit[];
@@ -119,18 +120,20 @@ export async function buildLiaBrainContext(args: {
   stepId?: string | null;
   transactions?: Array<{ id: string; label: string; amount: number; occurred_at: string }>;
 }): Promise<LiaBrainContext> {
-  const [memories, skills, knowledge, habits, behaviour, relationalResult] = await Promise.all([
+  const [memories, querySkills, intelligenceSkills, knowledge, habits, behaviour, relationalResult] = await Promise.all([
     retrieveLiaMemories(args.supabase, args.userId, args.query),
-    searchLiaSkills(args.supabase, args.userId, "financial agent intelligence", "intelligence", 2),
+    searchLiaSkills(args.supabase, args.userId, args.query, undefined, 8),
+    searchLiaSkills(args.supabase, args.userId, "financial agent intelligence", undefined, 6),
     retrieveFinancialKnowledge(args.supabase, args.query, { loopRunId: args.loopRunId, stepId: args.stepId }),
     loadFinancialHabits(args.supabase, args.userId),
     loadFinancialBehaviour(args.supabase, args.userId),
     args.supabase.rpc("lia_get_relational_context", { p_user_id: args.userId }),
   ]);
-  const skill = skills.find(s => s.slug === "financial-agent-intelligence") ?? null;
+  const mergedSkills = [...querySkills, ...intelligenceSkills].filter((item, index, arr) => arr.findIndex(x => x.skill_id === item.skill_id) === index).slice(0, 10);
+  const skill = mergedSkills.find(s => s.slug === "financial-agent-intelligence") ?? mergedSkills[0] ?? null;
   const relational = relationalResult.error || !relationalResult.data ? null : relationalResult.data as Record<string, unknown>;
   return {
-    skill, memories, knowledge, habits,
+    skill, skills: mergedSkills, memories, knowledge, habits,
     behaviouralProfile: behaviour.profile,
     behaviouralHabits: behaviour.habits,
     relational: relational?.consented_personalization === false ? null : relational,
@@ -141,6 +144,7 @@ export async function buildLiaBrainContext(args: {
 export function compactBrainContext(ctx: LiaBrainContext) {
   return {
     governed_skill: ctx.skill ? { slug: ctx.skill.slug, version: ctx.skill.version, trust_score: ctx.skill.trust_score, content: ctx.skill.content.slice(0, 4200) } : null,
+    selected_skills: ctx.skills.map(s => ({ slug:s.slug, name:s.name, category:s.category, version:s.version, trust_score:s.trust_score, content:s.content.slice(0, 2600) })),
     validated_knowledge: ctx.knowledge.map(k => ({ id:k.id, title:k.title, statement:k.statement, authority:k.authority, confidence:k.confidence, similarity:k.similarity })),
     durable_memory: compactMemoryContext(ctx.memories),
     behavioural_profile: ctx.behaviouralProfile,
@@ -150,7 +154,6 @@ export function compactBrainContext(ctx: LiaBrainContext) {
     governance: ctx.rules,
   };
 }
-
 
 export async function recordFinancialMemoryVersion(args: {
   memoryId: string;
@@ -221,7 +224,6 @@ export async function recordLiaProductionTelemetry(args: {
   tokensPerSecond?: number | null;
   estimatedCostCents?: number | null;
 }) {
-  // Production telemetry is meaningful only for the exact active Skill version.
   if (!args.skill || args.skill.status !== "active") return;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secret = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
