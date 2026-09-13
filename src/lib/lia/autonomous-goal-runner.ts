@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { executeAgentTool } from "@/lib/agent-runtime/executor";
 import { recordAgentLoopStep, recordEvidence } from "@/lib/agents/loop-engine";
 import { advanceGoalLifecycle, persistGoalLifecycle, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
+import { runLocalAutonomousAgent } from "@/lib/lia/autonomous-agent";
 
 const READ_ONLY_TOOLS = new Set([
   "get_financial_snapshot",
@@ -37,9 +38,9 @@ function safeToolSet(task: string): string[] {
 }
 
 /**
- * Bounded autonomous runner. It can only observe/read and advance a goal.
+ * Bounded autonomous runner. It observes deterministic financial data first,
+ * then lets the NEXORA LLM reason over the goal using the same governed tools.
  * It deliberately cannot execute write-sensitive or critical financial tools.
- * One HTTP call = one bounded run, preventing runaway agent loops.
  */
 export async function runAutonomousGoal(
   supabase: SupabaseClient,
@@ -72,7 +73,7 @@ export async function runAutonomousGoal(
   for (let i = 0; i < tools.length; i++) {
     const tool = tools[i];
     try {
-      const result = await executeAgentTool(supabase, userId, { name: tool });
+      const result = await executeAgentTool(supabase, userId, { name: tool }, { runId: loopRunId });
       observations.push({ tool, ok: true });
       await recordAgentLoopStep(supabase, loopRunId, 30 + i, {
         phase: "act", agentKey: "lia:autonomous-runner",
@@ -113,13 +114,46 @@ export async function runAutonomousGoal(
     status: "completed",
   });
 
-  // The runner stops before any financial mutation. A later iteration can continue from this state.
   current = advanceGoalLifecycle(current, "evaluating", "évaluer les observations et préparer la prochaine action", { completedStep: "autonomous_verify" });
   await persistGoalLifecycle(supabase, loopRunId, current);
 
-  // The bounded runner owns deterministic completion after observation + verification.
-  // No generative provider can mark a financial goal complete by itself.
-  current = advanceGoalLifecycle(current, "completed", "réévaluer si les données ou le contexte changent", { completedStep: "autonomous_evaluation", result: { observations: successCount, recommendation_only: true, autonomous_writes_allowed: false } });
+  // The LLM is now a bounded cognitive layer on top of the deterministic loop.
+  // If the local brain is not configured, the existing deterministic behavior remains valid.
+  let cognitiveResult: Awaited<ReturnType<typeof runLocalAutonomousAgent>> | null = null;
+  if (process.env.NEXORA_BRAIN_API_URL) {
+    cognitiveResult = await runLocalAutonomousAgent(supabase, userId, run.goal, { maxIterations: Math.min(3, bounded) });
+    await recordAgentLoopStep(supabase, loopRunId, 50, {
+      phase: "reason", agentKey: "lia:nexora-brain",
+      input: { objective: run.goal.slice(0, 1000), bounded_iterations: Math.min(3, bounded) },
+      output: { status: cognitiveResult.status, answer: cognitiveResult.answer.slice(0, 3000), steps: cognitiveResult.steps, model: cognitiveResult.model },
+      status: cognitiveResult.status === "failed" ? "failed" : "completed",
+    });
+  }
+
+  if (cognitiveResult?.status === "needs_human") {
+    current = advanceGoalLifecycle(current, "needs_human", "attendre la validation humaine requise par le cerveau", {
+      completedStep: "autonomous_llm_evaluation",
+      result: { observations: successCount, cognitive: { status: cognitiveResult.status, answer: cognitiveResult.answer.slice(0, 3000), model: cognitiveResult.model } },
+    });
+    await persistGoalLifecycle(supabase, loopRunId, current);
+    return { loopRunId, status: "needs_human", stepsExecuted: observations.length, observations, nextAction: current.nextAction, progress: current.progress };
+  }
+
+  current = advanceGoalLifecycle(current, "completed", "réévaluer si les données ou le contexte changent", {
+    completedStep: "autonomous_evaluation",
+    result: {
+      observations: successCount,
+      recommendation_only: true,
+      autonomous_writes_allowed: false,
+      cognitive: cognitiveResult ? {
+        status: cognitiveResult.status,
+        answer: cognitiveResult.answer.slice(0, 5000),
+        model: cognitiveResult.model,
+        iterations: cognitiveResult.iterations,
+        steps: cognitiveResult.steps,
+      } : { status: "not_configured" },
+    },
+  });
   await persistGoalLifecycle(supabase, loopRunId, current);
 
   return { loopRunId, status: "completed", stepsExecuted: observations.length, observations, nextAction: current.nextAction, progress: current.progress };
