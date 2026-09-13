@@ -85,9 +85,61 @@ export async function syncBankConnection({
       access_revoked_at: null,
       updated_at: new Date().toISOString(),
     };
-    const { data, error: upsertError } = await supabase.from("bank_accounts").upsert(row, { onConflict: "connection_id,external_account_id" }).select("id,external_account_id").single();
-    if (upsertError) throw upsertError;
+
+    // Powens peut fournir un nouvel external_account_id après une nouvelle connexion
+    // alors qu'il s'agit du même compte réel. Le masked IBAN est notre identité logique.
+    let existingId: string | null = null;
+    if (account.ibanMasked) {
+      const { data: existing, error: existingError } = await supabase
+        .from("bank_accounts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("provider", account.provider)
+        .eq("iban_masked", account.ibanMasked)
+        .eq("currency", account.currency)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      existingId = existing?.id ? String(existing.id) : null;
+    }
+
+    let data: { id: string; external_account_id: string };
+    if (existingId) {
+      const { data: updated, error: updateError } = await supabase
+        .from("bank_accounts")
+        .update({
+          name: account.name,
+          account_type: account.accountType,
+          iban_masked: account.ibanMasked ?? null,
+          currency: account.currency,
+          balance: Number.isFinite(account.balance ?? NaN) ? account.balance : null,
+          available_balance: Number.isFinite(account.availableBalance ?? NaN) ? account.availableBalance : null,
+          last_synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          status: "active",
+        })
+        .eq("id", existingId)
+        .eq("user_id", userId)
+        .select("id,external_account_id")
+        .single();
+      if (updateError || !updated) throw updateError ?? new Error("Impossible de mettre à jour le compte bancaire existant.");
+      data = updated;
+    } else {
+      const { data: inserted, error: upsertError } = await supabase
+        .from("bank_accounts")
+        .upsert(row, { onConflict: "connection_id,external_account_id" })
+        .select("id,external_account_id")
+        .single();
+      if (upsertError || !inserted) throw upsertError ?? new Error("Impossible d'enregistrer le compte bancaire.");
+      data = inserted;
+    }
+
+    // Map both identifiers so transactions from either Powens connection resolve
+    // to the same logical account row.
     accountIds.set(String(data.external_account_id), String(data.id));
+    accountIds.set(String(account.externalAccountId), String(data.id));
+
     if (account.balance != null && Number.isFinite(account.balance)) {
       const accountId = String(data.id);
       const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
