@@ -1,8 +1,0 @@
-{
-  "agent_loop_run_id": "uuid|null",
-  "agent_loop_step_id": "uuid|null",
-  "event_type": "tool_call|tool_failure|retry|policy_block|approval_request|memory_mutation|drift|evidence_mismatch|decision_reversal",
-  "severity": "info|warning|high|critical",
-  "metadata": {},
-  "created_at": "datetime"
-}

@@ -1,2 +1,0 @@
-export function remainingSpendable(params:{balance:number;incomeRemaining:number;commitmentsRemaining:number;essentialEstimate:number;safetyBuffer:number}){return params.balance+params.incomeRemaining-params.commitmentsRemaining-params.essentialEstimate-params.safetyBuffer}
-export function weeklyBudget(spendable:number,weeksRemaining:number){return weeksRemaining>0?Math.max(0,spendable/weeksRemaining):0}

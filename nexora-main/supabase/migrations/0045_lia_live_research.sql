@@ -1,4 +1,0 @@
--- v4.88: live research remains proposal/evidence-only; it cannot activate actions.
--- Reuses lia_research_runs to avoid a second persistence model.
--- The API enforces: authenticated user, same-origin, trusted domains, GET-only gateway,
--- bounded sources, redirects, timeout and size limits, and activation_allowed=false.

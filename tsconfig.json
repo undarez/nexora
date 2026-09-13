@@ -39,6 +39,9 @@
   "exclude": [
     "node_modules",
     "knowledge/pipelines/**/supabase/functions/**",
-    "work/**"
+    "work/**",
+    "knowledge/**/supabase/functions/**",
+    "supabase/functions/**",
+    "**/supabase/functions/**"
   ]
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BrainCircuit, ChevronDown, Lightbulb, MessageCircle, Send, Settings2, ShieldCheck, Sparkles, X, CheckCircle2, AlertTriangle, RotateCcw, Target, CircleDot } from "lucide-react";
+import { ArrowRight, BrainCircuit, ChevronDown, Lightbulb, MessageCircle, Send, Settings2, ShieldCheck, Sparkles, X, CheckCircle2, AlertTriangle, RotateCcw, Target, CircleDot, Volume2, Square } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { DEFAULT_MASCOT_ID, getMascot, MASCOT_ENABLED_KEY, MASCOT_ID_KEY } from "@/lib/mascot/mascot-data";
@@ -55,6 +55,9 @@ export function NexoAssistant() {
   const [proposals, setProposals] = useState<ActionProposal[]>([]);
   const [impactPreviews, setImpactPreviews] = useState<Record<string, ImpactPreview | null>>({});
   const [previewBusy, setPreviewBusy] = useState<Record<string, boolean>>({});
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceAudio, setVoiceAudio] = useState<HTMLAudioElement | null>(null);
+
 
   useEffect(() => {
     setPathname(window.location.pathname);
@@ -74,6 +77,40 @@ export function NexoAssistant() {
   const mascot = getMascot(mascotId);
   const insights = useMemo(() => buildInsights(pathname), [pathname]);
   const current = insights[0];
+
+  async function speak(text: string) {
+    if (!text.trim() || voiceBusy) return;
+    if (voiceAudio) {
+      voiceAudio.pause();
+      voiceAudio.currentTime = 0;
+      setVoiceAudio(null);
+    }
+    setVoiceBusy(true);
+    try {
+      const response = await fetch("/api/lia/voice/synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text.slice(0, 5000),
+          provider: undefined,
+          style: "Voix chaleureuse, claire, naturelle, française, avec un débit conversationnel.",
+        }),
+      });
+      if (!response.ok) throw new Error("Synthèse vocale indisponible.");
+      const blob = await response.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.onended = () => {
+        URL.revokeObjectURL(audio.src);
+        setVoiceAudio(null);
+        setVoiceBusy(false);
+      };
+      setVoiceAudio(audio);
+      await audio.play();
+    } catch (error) {
+      console.warn("Voix Nexo indisponible:", error);
+      setVoiceBusy(false);
+    }
+  }
 
   async function loadProposals() {
     try {
@@ -224,7 +261,12 @@ export function NexoAssistant() {
         {messages.length > 0 && <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
           {messages.map((message, index) => <div key={`${message.role}-${index}`} className={cn("flex gap-2", message.role === "user" ? "justify-end" : "items-end")}>
             {message.role === "assistant" && <div className="h-8 w-7 shrink-0 overflow-hidden rounded-lg border bg-background"><img src={mascot.image} alt="" className="h-full w-full object-contain" /></div>}
-            <div className={cn("max-w-[86%] whitespace-pre-wrap rounded-2xl px-3 py-2.5 text-xs leading-5", message.role === "user" ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md bg-muted")}>{message.content}</div>
+            <div className="flex max-w-[88%] items-end gap-1.5">
+              <div className={cn("whitespace-pre-wrap rounded-2xl px-3 py-2.5 text-xs leading-5", message.role === "user" ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md bg-muted")}>{message.content}</div>
+              {message.role === "assistant" && <button type="button" onClick={() => { if (voiceAudio) { voiceAudio.pause(); voiceAudio.currentTime = 0; setVoiceAudio(null); setVoiceBusy(false); } else void speak(message.content); }} className="rounded-lg border bg-background p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-50" aria-label={voiceAudio ? "Arrêter la voix" : "Écouter la réponse"} disabled={voiceBusy && !voiceAudio}>
+                {voiceAudio ? <Square className="h-3 w-3" /> : <Volume2 className="h-3.5 w-3.5" />}
+              </button>}
+            </div>
           </div>)}
           {busy && <div className="flex items-end gap-2"><div className="h-8 w-7 overflow-hidden rounded-lg border bg-background"><img src={mascot.image} alt="" className="h-full w-full object-contain" /></div><div className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-xs text-muted-foreground">Nexo vérifie les éléments…</div></div>}
         </div>}

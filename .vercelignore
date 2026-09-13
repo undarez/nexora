@@ -1,0 +1,6 @@
+# Vercel only: Supabase Edge Functions run on Deno and are deployed by Supabase, not Next.js.
+knowledge/pipelines/**/supabase/functions/**
+supabase/functions/**
+# Local/generated artifacts
+node_modules
+.next

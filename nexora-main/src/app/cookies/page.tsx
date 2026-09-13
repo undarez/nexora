@@ -1,9 +1,0 @@
-import { LegalPage, LegalSection } from "@/components/legal/legal-page";
-import { PrivacyControls } from "@/components/legal/privacy-controls";
-
-export default function CookiesPage() { return <LegalPage title="Cookies & autres traceurs" eyebrow="Transparence" intro="NEXORA privilégie une approche de minimisation : aucun traceur publicitaire ou de suivi tiers optionnel n’est activé par défaut dans cette version.">
-  <LegalSection title="Traceurs nécessaires"><p>Des mécanismes strictement nécessaires peuvent être utilisés pour l’authentification, la sécurité, la session et le fonctionnement technique du service. Lorsqu’ils entrent dans une exemption légale de consentement, ils ne nécessitent pas de consentement préalable, tout en restant soumis aux obligations applicables en matière de données personnelles.</p></LegalSection>
-  <LegalSection title="Traceurs optionnels"><p>Les traceurs de mesure d’audience non exemptés, de personnalisation ou de marketing ne doivent pas être activés avant le consentement de l’utilisateur. Si de tels outils sont ajoutés, leurs finalités, responsables, durées et éventuels destinataires seront documentés et le mécanisme de consentement sera mis à jour.</p></LegalSection>
-  <LegalSection title="Vos choix"><p>Vous pouvez consulter et enregistrer vos préférences ici. Le centre de préférences mémorise actuellement votre choix localement ; aucun service optionnel n’est activé par ce mécanisme à lui seul.</p><div className="mt-4 rounded-2xl border bg-card p-4"><PrivacyControls /></div></LegalSection>
-  <LegalSection title="Retirer ou modifier son consentement"><p>Lorsque des traceurs soumis à consentement seront déployés, le retrait devra être aussi simple que l’acceptation. Le choix devra rester accessible depuis l’interface et être conservé selon une durée conforme aux règles applicables.</p></LegalSection>
-</LegalPage>; }

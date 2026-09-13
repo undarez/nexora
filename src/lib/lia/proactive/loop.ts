@@ -81,7 +81,7 @@ export async function runProactiveFinancialLoop(supabase: SupabaseClient, userId
     const selectedSkills = [...baseline, ...(useCase ? skills.filter(skill => useCase.required_skills.includes(skill.slug) || useCase.required_skills.includes(skill.name)) : skills)].filter((skill, index, arr) => arr.findIndex(x => x.slug === skill.slug) === index).slice(0, 6);
     await recordAgentLoopStep(supabase, loopId, order++, { phase: "plan", agentKey: "lia", input: { use_case: useCase?.slug ?? null }, output: { use_case: useCase, skills: selectedSkills.map(skill => skill.slug) }, status: "completed" });
 
-    let synthesis: { content: string; model: string; provider: "local_native" | "ollama" | "remote" | "deterministic" };
+    let synthesis: Awaited<ReturnType<typeof liaChat>>;
     try {
       synthesis = await liaChat([
       { role: "system", content: "Tu es LIA, superviseur financier de Gérer Finance. Tu analyses uniquement les preuves fournies. Tu ne dois jamais inventer une donnée, exécuter une opération financière ou transformer une hypothèse en fait." },

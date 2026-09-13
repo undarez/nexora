@@ -1,9 +1,0 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { assertSameOrigin } from "@/lib/security/csrf";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { learnFinancialBehaviour, loadFinancialBehaviour } from "@/lib/lia/financial-memory/behaviour";
-
-function admin(){const url=process.env.NEXT_PUBLIC_SUPABASE_URL;const key=process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY;if(!url||!key)throw new Error("Configuration serveur incomplète.");return createAdminClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}})}
-export async function GET(){try{const supa=await createClient();if(!supa)return NextResponse.json({error:"Supabase indisponible."},{status:500});const {data:{user}}=await supa.auth.getUser();if(!user)return NextResponse.json({error:"Non authentifié."},{status:401});const a=admin();const result=await loadFinancialBehaviour(a,user.id);return NextResponse.json(result);}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Profil comportemental indisponible."},{status:500});}}
-export async function POST(request: Request){try{assertSameOrigin(request);const supa=await createClient();if(!supa)return NextResponse.json({error:"Supabase indisponible."},{status:500});const {data:{user}}=await supa.auth.getUser();if(!user)return NextResponse.json({error:"Non authentifié."},{status:401});const a=admin();const {data,error}=await a.from("transactions").select("id,label,amount,occurred_at,category_id").eq("user_id",user.id).order("occurred_at",{ascending:true}).limit(1000);if(error)throw error;const result=await learnFinancialBehaviour({supabase:a,userId:user.id,transactions:(data??[]).map(t=>({...t,amount:Number(t.amount)}))});return NextResponse.json(result);}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Apprentissage indisponible."},{status:500});}}

@@ -88,7 +88,14 @@ export async function liaChat(messages: LiaProviderMessage[], signal?: AbortSign
   if (config.mode === "native_first" || config.mode === "native_only") {
     if (config.native.configured) {
       try {
-        return await nexoraBrainChat(messages, signal);
+        const brain = await nexoraBrainChat(messages, signal);
+        // The Brain contract may expose its concrete inference engine
+        // (e.g. "llama_cpp"). Keep that implementation detail behind the
+        // provider boundary so callers only depend on LiaProviderName.
+        return {
+          ...brain,
+          provider: brain.provider === "llama_cpp" ? "native" : brain.provider,
+        };
       } catch (error) {
         errors.push(error instanceof Error ? error.message : "NEXORA Brain indisponible.");
         if (config.mode === "native_only") return { content: deterministicFallback([...messages].reverse().find(m => m.role === "user")?.content || ""), model: "deterministic-fallback", provider: "deterministic" };

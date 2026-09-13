@@ -33,7 +33,10 @@ export function listExecutableLiaSkills(): ExecutableLiaSkill[] {
   return [...registry.values()];
 }
 
-export function canExecuteLiaSkill(skill: ExecutableLiaSkill, permissions: readonly LiaPermission[]): boolean {
+export function canExecuteLiaSkill<TInput = unknown, TOutput = unknown>(
+  skill: ExecutableLiaSkill<TInput, TOutput>,
+  permissions: readonly LiaPermission[],
+): boolean {
   return skill.requiredPermissions.every(permission => permissions.includes(permission));
 }
 

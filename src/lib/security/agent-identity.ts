@@ -8,9 +8,19 @@ export type AgentPrincipal = {
   organizationId: string;
 };
 
+/**
+ * LIA is a distinct security principal. The model never receives the user UUID.
+ * The identifier is deterministic per user and scoped to this application.
+ */
 export function getLiaPrincipal(userId: string): AgentPrincipal {
   const digest = createHash("sha256").update(`gerer-finance:lia:${userId}`).digest("hex").slice(0, 32);
-  return { agentId: `lia_${digest}`, agentKey: "lia", userId, role: "financial_assistant", organizationId: `user:${digest}` };
+  return {
+    agentId: `lia_${digest}`,
+    agentKey: "lia",
+    userId,
+    role: "financial_assistant",
+    organizationId: `user:${digest}`,
+  };
 }
 
 export type AgentPolicyDecision = { allowed: true; reason?: string } | { allowed: false; reason: string };
@@ -22,11 +32,7 @@ const POLICIES: Record<string, { minAutonomy: number; approval: boolean; risk: s
   get_wealth_snapshot: { minAutonomy: 0, approval: false, risk: "read" },
   get_forecast: { minAutonomy: 0, approval: false, risk: "read" },
   search_transactions: { minAutonomy: 0, approval: false, risk: "read" },
-  search_use_cases: { minAutonomy: 0, approval: false, risk: "read" },
   search_skills: { minAutonomy: 0, approval: false, risk: "read" },
-  research_web: { minAutonomy: 1, approval: false, risk: "read" },
-  create_agent_tool: { minAutonomy: 1, approval: false, risk: "recommendation" },
-  learn_use_case: { minAutonomy: 1, approval: false, risk: "recommendation" },
   learn_skill: { minAutonomy: 1, approval: false, risk: "recommendation" },
   save_financial_insight: { minAutonomy: 3, approval: false, risk: "recommendation" },
   create_recommendation: { minAutonomy: 1, approval: false, risk: "recommendation" },
@@ -34,7 +40,9 @@ const POLICIES: Record<string, { minAutonomy: number; approval: boolean; risk: s
 
 /** Server-side policy gate. LLM output is never an authorization decision. */
 export function authorizeAgentTool(principal: AgentPrincipal, toolName: string, autonomyLevel = 1): AgentPolicyDecision {
-  if (principal.agentKey !== "lia" || principal.role !== "financial_assistant") return { allowed: false, reason: "agent_identity_denied" };
+  if (principal.agentKey !== "lia" || principal.role !== "financial_assistant") {
+    return { allowed: false, reason: "agent_identity_denied" };
+  }
   const policy = POLICIES[toolName];
   if (!policy) return { allowed: false, reason: "tool_policy_missing" };
   if (autonomyLevel < policy.minAutonomy) return { allowed: false, reason: "autonomy_level_insufficient" };
@@ -43,4 +51,6 @@ export function authorizeAgentTool(principal: AgentPrincipal, toolName: string, 
   return { allowed: true };
 }
 
-export function getAgentPolicy(toolName: string) { return POLICIES[toolName] ?? null; }
+export function getAgentPolicy(toolName: string) {
+  return POLICIES[toolName] ?? null;
+}

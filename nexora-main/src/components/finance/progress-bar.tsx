@@ -1,1 +1,0 @@
-export function ProgressBar({ value, max }: { value: number; max: number }) { const pct = max > 0 ? Math.min(100, Math.max(0, value / max * 100)) : 0; return <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600 transition-all" style={{width: `${pct}%`}} /></div>; }

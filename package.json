@@ -94,7 +94,6 @@
     "lia:financial-data-gateway-regression": "node scripts/lia-financial-data-gateway-regression.mjs",
     "lia:personal-financial-model": "node scripts/lia-personal-financial-model-regression.mjs",
     "typecheck": "tsc --noEmit",
-    "lia:agent-harness": "node --experimental-strip-types scripts/lia-agent-harness-regression.mjs",
     "banking:check": "node scripts/banking-regression.mjs",
     "financial:cross-domain": "node scripts/financial-cross-domain-regression.mjs",
     "finance:architecture": "node scripts/finance-architecture-regression.mjs",
@@ -142,7 +141,10 @@
     "production:readiness": "node scripts/v5.10.00-final-production-audit.mjs",
     "production:suite": "node scripts/v5.10.01-16-production-suite-regression.mjs",
     "production:release-candidate": "node scripts/v5.11.00-release-candidate-regression.mjs",
-    "user-guide:check": "node scripts/v5.11.02-user-guide-regression.mjs"
+    "user-guide:check": "node scripts/v5.11.02-user-guide-regression.mjs",
+    "lia:agent-harness": "node scripts/lia-agent-harness-regression.mjs",
+    "lia:voice": "node scripts/lia-voice-regression.mjs",
+    "lia:multi-skill": "node scripts/lia-multi-skill-regression.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

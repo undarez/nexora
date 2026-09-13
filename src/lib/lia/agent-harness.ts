@@ -1,3 +1,10 @@
+/**
+ * NEXORA Agentic Harness
+ *
+ * A bounded execution governor. It does not authorize tools; the existing
+ * server-side Policy Engine remains authoritative. The harness only limits,
+ * records and stops agent trajectories.
+ */
 export type HarnessLimits = {
   maxSteps: number;
   maxToolCalls: number;
