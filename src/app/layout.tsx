@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { DashboardBankingInteractionBridge } from "@/components/dashboard-banking-interaction-bridge";
 import { BankAccountDeduplicationManager } from "@/components/bank-account-deduplication-manager";
 import { MonthlyTransactionsBridge } from "@/components/finance/monthly-transactions-bridge";
-import { BillingPlanBadge } from "@/components/billing-plan-badge";
+import { CookieConsentBanner } from "@/components/legal/cookie-consent-banner";
 
 export const metadata: Metadata = {
   title: "Nexora",
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <DashboardBankingInteractionBridge />
           <BankAccountDeduplicationManager />
           <MonthlyTransactionsBridge />
-          <BillingPlanBadge />
+          <CookieConsentBanner />
           <Footer />
         </ThemeProvider>
       </body>
