@@ -29,6 +29,9 @@ const STATE_PROGRESS: Record<LiaGoalState, number> = {
   learning: 91, memorizing: 95, completed: 100, blocked: 0, needs_human: 0, failed: 0,
 };
 
+const TERMINAL_STATES = new Set<LiaGoalState>(["completed", "failed", "blocked", "needs_human"]);
+const RUNNING_STATES = new Set<LiaGoalState>(["objective", "understanding", "decomposing", "researching", "planning", "executing", "observing", "verifying", "evaluating", "correcting", "learning", "memorizing"]);
+
 export function createGoalLifecycle(goalId: string, objective: string, successCriteria: string[] = []): LiaGoalLifecycle {
   const now = new Date().toISOString();
   return { goalId, objective: objective.slice(0, 2000), state: "objective", progress: 5, completedSteps: [], currentStep: "objective", nextAction: "comprendre la demande", successCriteria: successCriteria.slice(0, 8), blockers: [], startedAt: now, updatedAt: now, completedAt: null, result: null };
@@ -37,17 +40,21 @@ export function createGoalLifecycle(goalId: string, objective: string, successCr
 export function advanceGoalLifecycle(current: LiaGoalLifecycle, state: LiaGoalState, nextAction: string, details: { completedStep?: string; blocker?: string; result?: Record<string, unknown> } = {}): LiaGoalLifecycle {
   const completedSteps = details.completedStep && !current.completedSteps.includes(details.completedStep) ? [...current.completedSteps, details.completedStep].slice(-20) : current.completedSteps;
   const blockers = details.blocker && !current.blockers.includes(details.blocker) ? [...current.blockers, details.blocker].slice(-10) : current.blockers;
-  const terminal = state === "completed" || state === "failed" || state === "blocked" || state === "needs_human";
   const now = new Date().toISOString();
-  return { ...current, state, progress: STATE_PROGRESS[state], currentStep: state, nextAction: nextAction.slice(0, 500), completedSteps, blockers, updatedAt: now, completedAt: terminal ? now : current.completedAt, result: details.result ?? current.result };
+  const terminal = TERMINAL_STATES.has(state);
+  return { ...current, state, progress: STATE_PROGRESS[state], currentStep: state, nextAction: nextAction.slice(0, 500), completedSteps, blockers, updatedAt: now, completedAt: terminal ? (current.completedAt ?? now) : null, result: details.result ?? current.result };
 }
 
 export async function persistGoalLifecycle(supabase: SupabaseClient, loopRunId: string, lifecycle: LiaGoalLifecycle) {
-  const { data: current, error: readError } = await supabase.from("agent_loop_runs").select("context,decision").eq("id", loopRunId).single();
+  const { data: current, error: readError } = await supabase.from("agent_loop_runs").select("status,context,decision").eq("id", loopRunId).single();
   if (readError) throw new Error(readError.message);
   const context = { ...(current?.context ?? {}), goal_lifecycle: lifecycle };
   const decision = { ...(current?.decision ?? {}), goal_lifecycle: { state: lifecycle.state, progress: lifecycle.progress, next_action: lifecycle.nextAction, blockers: lifecycle.blockers, completed_at: lifecycle.completedAt } };
-  const { error } = await supabase.from("agent_loop_runs").update({ context, decision, ...(lifecycle.completedAt ? { completed_at: lifecycle.completedAt } : {}) }).eq("id", loopRunId);
+  const status = TERMINAL_STATES.has(lifecycle.state) ? lifecycle.state : RUNNING_STATES.has(lifecycle.state) ? "running" : "running";
+  const patch: Record<string, unknown> = { status, context, decision };
+  if (lifecycle.completedAt) patch.completed_at = lifecycle.completedAt;
+  else patch.completed_at = null;
+  const { error } = await supabase.from("agent_loop_runs").update(patch).eq("id", loopRunId);
   if (error) throw new Error(error.message);
   return lifecycle;
 }

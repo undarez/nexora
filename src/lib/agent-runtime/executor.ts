@@ -9,6 +9,8 @@ import { searchLiaSkills } from "@/lib/lia/skills/registry";
 import { recordDecisionGate } from "@/lib/lia/financial-memory/governance";
 import { recordFinancialBehaviourEvent } from "@/lib/lia/financial-memory/pipeline";
 import { searchLiaUseCases, buildUseCaseCandidate } from "@/lib/lia/use-cases/registry";
+import { runLiveResearch } from "@/lib/lia/research/live";
+import { getLiaRuntimeControls } from "@/lib/lia/runtime/controls";
 
 export type ToolCall = { name: string; arguments?: Record<string, unknown> };
 
@@ -24,216 +26,65 @@ export async function executeAgentTool(
   const autonomyLevel = clampAutonomy(autonomyData, 1);
   const localAuthorization = authorizeAgentTool(principal, call.name, autonomyLevel);
   if (!localAuthorization.allowed && localAuthorization.reason !== "human_approval_required") throw new Error(`Policy agent refusée : ${localAuthorization.reason}`);
-
-  // Defense in depth: the authoritative policy is stored and evaluated in Supabase.
-  // The browser/model cannot call this gate; only the server-side service-role client can.
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secret = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !secret) throw new Error("Policy Engine Supabase indisponible : configuration serveur manquante.");
   const admin = createAdminClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } });
-
-  // Provision/repair the server-governed LIA principal before authorization.
-  // The client and model cannot choose agent_id, role or organization_id.
-  const { error: identityError } = await admin.from("lia_agent_identities").upsert({
-    agent_id: principal.agentId,
-    user_id: userId,
-    agent_key: principal.agentKey,
-    role: principal.role,
-    organization_id: principal.organizationId,
-    enabled: true,
-  }, { onConflict: "agent_id" });
+  const { error: identityError } = await admin.from("lia_agent_identities").upsert({ agent_id: principal.agentId, user_id: userId, agent_key: principal.agentKey, role: principal.role, organization_id: principal.organizationId, enabled: true }, { onConflict: "agent_id" });
   if (identityError) throw new Error(`Identité agent indisponible : ${identityError.message}`);
-
-  const { data: dbDecision, error: dbPolicyError } = await admin.rpc("authorize_lia_tool", {
-    p_agent_id: principal.agentId,
-    p_user_id: userId,
-    p_organization_id: principal.organizationId,
-    p_tool_key: call.name,
-    p_autonomy_level: autonomyLevel,
-  });
+  const { data: dbDecision, error: dbPolicyError } = await admin.rpc("authorize_lia_tool", { p_agent_id: principal.agentId, p_user_id: userId, p_organization_id: principal.organizationId, p_tool_key: call.name, p_autonomy_level: autonomyLevel });
   if (dbPolicyError) throw new Error(`Policy Engine indisponible : ${dbPolicyError.message}`);
   const policyReason = dbDecision?.reason ?? "policy_denied";
-  if (!dbDecision?.allowed) {
-    await recordFinancialBehaviourEvent({
-      runId: governanceContext?.runId,
-      stepId: governanceContext?.stepId,
-      eventType: policyReason === "human_approval_required" ? "approval_request" : "policy_block",
-      severity: policyReason === "human_approval_required" ? "warning" : "high",
-      metadata: { tool: call.name, reason: policyReason },
-    });
-  }
+  if (!dbDecision?.allowed) await recordFinancialBehaviourEvent({ runId: governanceContext?.runId, stepId: governanceContext?.stepId, eventType: policyReason === "human_approval_required" ? "approval_request" : "policy_block", severity: policyReason === "human_approval_required" ? "warning" : "high", metadata: { tool: call.name, reason: policyReason } });
   if (!dbDecision?.allowed && policyReason !== "human_approval_required") throw new Error(`Policy agent refusée par Supabase : ${policyReason}`);
   const definition = getAgentTool(call.name);
   if (!definition) throw new Error(`Outil agentique inconnu : ${call.name}`);
   const riskLevel = definition.risk === "write-sensitive" ? "high" : definition.risk === "recommendation" ? "medium" : "low";
-  const gate = await recordDecisionGate({
-    runId: governanceContext?.runId,
-    stepId: governanceContext?.stepId,
-    actionType: call.name,
-    riskLevel,
-    reversible: definition.risk !== "write-sensitive",
-    authorizationPresent: Boolean(dbDecision?.allowed || policyReason === "human_approval_required"),
-    policyId: dbDecision?.policy_id ?? dbDecision?.policyId ?? null,
-    knowledgeIds: governanceContext?.knowledgeIds,
-    evidenceIds: governanceContext?.evidenceIds,
-    rationale: { policy_reason: policyReason, local_authorization: localAuthorization.allowed, knowledge_is_not_authorization: true },
-  });
+  const gate = await recordDecisionGate({ runId: governanceContext?.runId, stepId: governanceContext?.stepId, actionType: call.name, riskLevel, reversible: definition.risk !== "write-sensitive", authorizationPresent: Boolean(dbDecision?.allowed || policyReason === "human_approval_required"), policyId: dbDecision?.policy_id ?? dbDecision?.policyId ?? null, knowledgeIds: governanceContext?.knowledgeIds, evidenceIds: governanceContext?.evidenceIds, rationale: { policy_reason: policyReason, local_authorization: localAuthorization.allowed, knowledge_is_not_authorization: true } });
   if (gate?.outcome === "BLOCK") throw new Error(`Decision Gate : action bloquée (${call.name}).`);
   if (gate?.outcome === "REQUIRE_APPROVAL" && policyReason !== "human_approval_required") throw new Error(`Decision Gate : validation humaine requise (${call.name}).`);
   if (definition.risk === "write-sensitive") throw new Error(`Outil sensible bloqué sans validation humaine : ${call.name}`);
-
   const args = call.arguments ?? {};
-
   switch (call.name) {
-    case "search_use_cases": {
-      const query = typeof args.query === "string" ? args.query : "";
-      return { use_cases: await searchLiaUseCases(admin, userId, query, typeof args.category === "string" ? args.category : undefined, Number(args.limit ?? 8)) };
+    case "research_web": {
+      const controls = await getLiaRuntimeControls(supabase);
+      if (!controls.ai_enabled || !controls.web_research_enabled) throw new Error("Recherche web LIA désactivée par le kill switch ou la politique d'administration.");
+      const query = typeof args.query === "string" ? args.query.trim().slice(0, 2000) : "";
+      if (!query) throw new Error("Une requête de recherche web est obligatoire.");
+      const maxSources = Math.min(Math.max(Number(args.max_sources ?? 4), 1), 6);
+      const timeoutMs = Math.min(Math.max(Number(args.timeout_ms ?? 8000), 2000), 12000);
+      const result = await runLiveResearch({ query, maxSources, timeoutMs, discover: args.discover !== false });
+      await admin.from("lia_research_runs").insert({ user_id: userId, query, evidence: result.evidence ?? [], claims: result.claims ?? [], contradictions: result.contradictions ?? [], stale_evidence: result.staleEvidence ?? [], unknowns: result.unknowns ?? [], minimum_evidence_met: Boolean(result.minimumEvidenceMet), knowledge_graph_ready: Boolean(result.minimumEvidenceMet), activation_allowed: false });
+      return { query, live: true, read_only: true, activation_allowed: false, ...result };
     }
+    case "search_use_cases": { const query = typeof args.query === "string" ? args.query : ""; return { use_cases: await searchLiaUseCases(admin, userId, query, typeof args.category === "string" ? args.category : undefined, Number(args.limit ?? 8)) }; }
     case "learn_use_case": {
       if (autonomyLevel < 1) throw new Error("La création d’un Use Case candidat nécessite L1.");
-      const candidate = buildUseCaseCandidate({
-        name: typeof args.name === "string" ? args.name : "Use Case appris",
-        description: typeof args.description === "string" ? args.description : "Scénario réutilisable proposé par LIA.",
-        objective: typeof args.objective === "string" ? args.objective : "Objectif à préciser.",
-        trigger: typeof args.trigger === "string" ? args.trigger : "Demande utilisateur ou nouvelle capacité.",
-        requiredContext: Array.isArray(args.required_context) ? args.required_context.filter((x): x is string => typeof x === "string").slice(0, 20) : [],
-        requiredSkills: Array.isArray(args.required_skills) ? args.required_skills.filter((x): x is string => typeof x === "string").slice(0, 20) : [],
-        suggestedTools: Array.isArray(args.suggested_tools) ? args.suggested_tools.filter((x): x is string => typeof x === "string").slice(0, 20) : [],
-        riskClass: (typeof args.risk_class === "string" && ["read","recommendation","write-sensitive","critical"].includes(args.risk_class) ? args.risk_class : "read") as "read" | "recommendation" | "write-sensitive" | "critical",
-        minimumAutonomy: Number(args.minimum_autonomy ?? 0),
-        humanApprovalRequired: Boolean(args.human_approval_required),
-        successCriteria: Array.isArray(args.success_criteria) ? args.success_criteria.filter((x): x is string => typeof x === "string").slice(0, 20) : [],
-        verificationRules: Array.isArray(args.verification_rules) ? args.verification_rules.filter((x): x is string => typeof x === "string").slice(0, 20) : [],
-      });
+      const candidate = buildUseCaseCandidate({ name: typeof args.name === "string" ? args.name : "Use Case appris", description: typeof args.description === "string" ? args.description : "Scénario réutilisable proposé par LIA.", objective: typeof args.objective === "string" ? args.objective : "Objectif à préciser.", trigger: typeof args.trigger === "string" ? args.trigger : "Demande utilisateur ou nouvelle capacité.", requiredContext: Array.isArray(args.required_context) ? args.required_context.filter((x): x is string => typeof x === "string").slice(0, 20) : [], requiredSkills: Array.isArray(args.required_skills) ? args.required_skills.filter((x): x is string => typeof x === "string").slice(0, 20) : [], suggestedTools: Array.isArray(args.suggested_tools) ? args.suggested_tools.filter((x): x is string => typeof x === "string").slice(0, 20) : [], riskClass: (typeof args.risk_class === "string" && ["read","recommendation","write-sensitive","critical"].includes(args.risk_class) ? args.risk_class : "read") as "read" | "recommendation" | "write-sensitive" | "critical", minimumAutonomy: Number(args.minimum_autonomy ?? 0), humanApprovalRequired: Boolean(args.human_approval_required), successCriteria: Array.isArray(args.success_criteria) ? args.success_criteria.filter((x): x is string => typeof x === "string").slice(0, 20) : [], verificationRules: Array.isArray(args.verification_rules) ? args.verification_rules.filter((x): x is string => typeof x === "string").slice(0, 20) : [] });
       if (candidate.requiredSkills.length === 0 || candidate.successCriteria.length === 0 || candidate.verificationRules.length === 0) throw new Error("Un Use Case candidat doit préciser skills, critères de réussite et règles de vérification.");
       const slug = candidate.name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,60) || "use-case-appris";
-      const { data, error } = await admin.rpc("lia_create_use_case_candidate", {
-        p_user_id:userId,p_scope:"user",p_slug:slug,p_name:candidate.name,p_description:candidate.description,p_category:typeof args.category === "string" ? args.category.slice(0,60) : "general",p_objective:candidate.objective,p_trigger:candidate.trigger,
-        p_required_context:candidate.requiredContext,p_required_skills:candidate.requiredSkills,p_suggested_tools:candidate.suggestedTools,p_risk_class:candidate.riskClass,p_minimum_autonomy:candidate.minimumAutonomy,p_human_approval_required:candidate.humanApprovalRequired,p_success_criteria:candidate.successCriteria,p_verification_rules:candidate.verificationRules,p_source_type:"agent_generated"
-      });
-      if (error) throw new Error(`Impossible de créer le Use Case candidat : ${error.message}`);
-      return { use_case_id:data, status:"candidate", activation:"blocked_until_validation" };
+      const { data, error } = await admin.rpc("lia_create_use_case_candidate", { p_user_id:userId,p_scope:"user",p_slug:slug,p_name:candidate.name,p_description:candidate.description,p_category:typeof args.category === "string" ? args.category.slice(0,60) : "general",p_objective:candidate.objective,p_trigger:candidate.trigger,p_required_context:candidate.requiredContext,p_required_skills:candidate.requiredSkills,p_suggested_tools:candidate.suggestedTools,p_risk_class:candidate.riskClass,p_minimum_autonomy:candidate.minimumAutonomy,p_human_approval_required:candidate.humanApprovalRequired,p_success_criteria:candidate.successCriteria,p_verification_rules:candidate.verificationRules,p_source_type:"agent_generated" });
+      if (error) throw new Error(`Impossible de créer le Use Case candidat : ${error.message}`); return { use_case_id:data, status:"candidate", activation:"blocked_until_validation" };
     }
-    case "search_skills": {
-      const query = typeof args.query === "string" ? args.query : "";
-      return { skills: await searchLiaSkills(admin, userId, query, typeof args.category === "string" ? args.category : undefined, Number(args.limit ?? 8)) };
-    }
+    case "search_skills": { const query = typeof args.query === "string" ? args.query : ""; return { skills: await searchLiaSkills(admin, userId, query, typeof args.category === "string" ? args.category : undefined, Number(args.limit ?? 8)) }; }
     case "learn_skill": {
       if (autonomyLevel < 1) throw new Error("L'apprentissage procédural nécessite L1.");
-      const name = typeof args.name === "string" ? args.name.slice(0, 120) : "Skill appris";
-      const description = typeof args.description === "string" ? args.description.slice(0, 500) : "Procédure réutilisable apprise par LIA.";
-      const procedure = typeof args.procedure === "string" ? args.procedure.slice(0, 12000) : "";
-      if (procedure.length < 20) throw new Error("La procédure à mémoriser est insuffisante.");
+      const name = typeof args.name === "string" ? args.name.slice(0, 120) : "Skill appris"; const description = typeof args.description === "string" ? args.description.slice(0, 500) : "Procédure réutilisable apprise par LIA."; const procedure = typeof args.procedure === "string" ? args.procedure.slice(0, 12000) : ""; if (procedure.length < 20) throw new Error("La procédure à mémoriser est insuffisante.");
       const slug = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "skill-appris";
-      const candidate = await import("@/lib/lia/skills/registry").then(({ buildSkillCandidate }) => buildSkillCandidate({
-        name, description, procedure,
-        triggerContext: typeof args.trigger_context === "object" && args.trigger_context !== null ? args.trigger_context as Record<string, unknown> : {},
-        expectedResult: typeof args.expected_result === "string" ? args.expected_result.slice(0, 1000) : undefined,
-        verificationSteps: Array.isArray(args.verification_steps) ? args.verification_steps.filter((x): x is string => typeof x === "string").slice(0, 10) : undefined,
-        failureModes: Array.isArray(args.failure_modes) ? args.failure_modes.filter((x): x is string => typeof x === "string").slice(0, 10) : undefined,
-        sourceRefs: Array.isArray(args.source_refs) ? args.source_refs.filter((x): x is string => typeof x === "string").slice(0, 10) : undefined,
-        correction: typeof args.correction === "string" ? args.correction.slice(0, 5000) : undefined,
-      }));
-      const { data, error } = await admin.rpc("lia_create_skill_candidate", {
-        p_user_id:userId,p_scope:"user",p_slug:slug,p_name:candidate.name,p_description:candidate.description,p_category:typeof args.category === "string" ? args.category.slice(0,60) : "general",
-        p_source_type:typeof args.correction === "string" && args.correction.trim() ? "corrected" : "agent_generated",
-        p_content:candidate.content,p_trigger_context:candidate.triggerContext,p_expected_result:candidate.expectedResult,
-        p_verification_steps:candidate.verificationSteps,p_failure_modes:candidate.failureModes,p_source_refs:candidate.sourceRefs,p_memory_gate:candidate.memoryGate
-      });
-      if (error) throw new Error(`Impossible de mémoriser le skill : ${error.message}`);
-      return { skill_id:data, status:"candidate", activation:"blocked_until_validation", memory_gate:candidate.memoryGate };
+      const candidate = await import("@/lib/lia/skills/registry").then(({ buildSkillCandidate }) => buildSkillCandidate({ name, description, procedure, triggerContext: typeof args.trigger_context === "object" && args.trigger_context !== null ? args.trigger_context as Record<string, unknown> : {}, expectedResult: typeof args.expected_result === "string" ? args.expected_result.slice(0, 1000) : undefined, verificationSteps: Array.isArray(args.verification_steps) ? args.verification_steps.filter((x): x is string => typeof x === "string").slice(0, 10) : undefined, failureModes: Array.isArray(args.failure_modes) ? args.failure_modes.filter((x): x is string => typeof x === "string").slice(0, 10) : undefined, sourceRefs: Array.isArray(args.source_refs) ? args.source_refs.filter((x): x is string => typeof x === "string").slice(0, 10) : undefined, correction: typeof args.correction === "string" ? args.correction.slice(0, 5000) : undefined }));
+      const { data, error } = await admin.rpc("lia_create_skill_candidate", { p_user_id:userId,p_scope:"user",p_slug:slug,p_name:candidate.name,p_description:candidate.description,p_category:typeof args.category === "string" ? args.category.slice(0,60) : "general",p_source_type:typeof args.correction === "string" && args.correction.trim() ? "corrected" : "agent_generated",p_content:candidate.content,p_trigger_context:candidate.triggerContext,p_expected_result:candidate.expectedResult,p_verification_steps:candidate.verificationSteps,p_failure_modes:candidate.failureModes,p_source_refs:candidate.sourceRefs,p_memory_gate:candidate.memoryGate });
+      if (error) throw new Error(`Impossible de mémoriser le skill : ${error.message}`); return { skill_id:data, status:"candidate", activation:"blocked_until_validation", memory_gate:candidate.memoryGate };
     }
-    case "get_financial_snapshot": {
-      const projection = await buildLiaFinancialProjection({ supabase, userId, days: 90 });
-      return {
-        security_level: projection.security_level,
-        account_count: projection.accounts.count,
-        balance_total: projection.accounts.balance_total,
-        transaction_count: projection.transactions.count,
-        income: projection.transactions.income,
-        expenses: projection.transactions.expenses,
-        net: projection.transactions.net,
-        categories: projection.transactions.categories,
-        raw_data_exposed: false,
-        vault_payload_exposed: false,
-      };
-    }
-    case "get_budget_status": {
-      const { data, error } = await supabase.from("budgets").select("id,period_start,period_end,target_end_balance,budget_lines(id,category_id,planned_amount,actual_amount)").eq("user_id", userId).order("period_start", { ascending: false }).limit(3);
-      if (error) throw new Error(error.message);
-      return { budgets: data ?? [], data_available: (data ?? []).length > 0 };
-    }
-    case "get_cashflow": {
-      const days = Math.min(Math.max(Number(args.days ?? 90), 1), 365);
-      const since = new Date(Date.now() - days * 86400000).toISOString();
-      const { data, error } = await supabase.from("transactions").select("amount,occurred_at").eq("user_id", userId).gte("occurred_at", since).order("occurred_at", { ascending: true }).limit(1000);
-      if (error) throw new Error(error.message);
-      const rows = data ?? [];
-      const income = rows.filter(r=>Number(r.amount)>0).reduce((s,r)=>s+Number(r.amount),0);
-      const expenses = rows.filter(r=>Number(r.amount)<0).reduce((s,r)=>s+Math.abs(Number(r.amount)),0);
-      return { days, transaction_count: rows.length, income: Number(income.toFixed(2)), expenses: Number(expenses.toFixed(2)), net: Number((income-expenses).toFixed(2)), data_available: rows.length > 0 };
-    }
-    case "get_wealth_snapshot": {
-      const { data, error } = await supabase.from("wealth_entries").select("*").eq("user_id", userId).order("valuation_date", { ascending: false }).limit(500);
-      if (error) throw new Error(error.message);
-      const rows = data ?? [];
-      return { entry_count: rows.length, entries: rows, data_available: rows.length > 0 };
-    }
-    case "get_forecast": {
-      const { data, error } = await supabase.from("forecasts").select("horizon,scenario,projected_balance,confidence,assumptions,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(30);
-      if (error) throw new Error(error.message);
-      return { forecast_count: data?.length ?? 0, forecasts: data ?? [], data_available: (data ?? []).length > 0 };
-    }
-    case "search_transactions": {
-      const query = typeof args.query === "string" ? args.query.trim().slice(0,100) : "";
-      const limit = Math.min(Math.max(Number(args.limit ?? 50),1),100);
-      let request = supabase.from("transactions").select("id,amount,occurred_at,label,source,category_id,categories(name)").eq("user_id", userId).order("occurred_at",{ascending:false}).limit(limit);
-      if (query) request = request.ilike("label", `%${query}%`);
-      const { data, error } = await request;
-      if (error) throw new Error(error.message);
-      return { query, count: data?.length ?? 0, transactions: data ?? [], data_available: (data ?? []).length > 0 };
-    }
-    case "create_recommendation": {
-      const title = typeof args.title === "string" ? args.title.slice(0,200) : "Recommandation IA";
-      const body = typeof args.body === "string" ? args.body.slice(0,10000) : "";
-      if (!body) throw new Error("Une recommandation doit contenir un contenu.");
-      const { data, error } = await admin.from("lia_action_proposals").insert({
-        user_id:userId, agent_id:principal.agentId, action_key:"create_recommendation",
-        title, description:body, risk_class:"recommendation", autonomy_level:autonomyLevel,
-        reversible:true, payload:{ title, body }, rollback_payload:{ action:"delete_recommendation_by_proposal" },
-        status:"proposed", expires_at:new Date(Date.now()+15*60*1000).toISOString()
-      }).select("id,created_at,status").single();
-      if (error) throw new Error(`Impossible de créer la proposition : ${error.message}`);
-      return { proposal_id:data.id, created_at:data.created_at, status:data.status, requires_human_approval:true };
-    }
-    case "save_financial_insight": {
-      const title = typeof args.title === "string" ? args.title.slice(0, 200) : "Observation financière";
-      const body = typeof args.body === "string" ? args.body.slice(0, 5000) : "";
-      if (!body) throw new Error("Une observation financière doit contenir un contenu.");
-      if (autonomyLevel < 3) throw new Error("Cette action nécessite L3.");
-      const executionKey = createHash("sha256").update(`insight:${userId}:${principal.agentId}:${title}:${body}`).digest("hex").slice(0, 48);
-      const { data: existing } = await admin.from("lia_action_proposals").select("id,status").eq("user_id", userId).eq("execution_key", executionKey).maybeSingle();
-      if (existing) return { status:"already_executed", execution_key:executionKey, proposal_id:existing.id };
-      const { data, error } = await admin.from("lia_action_proposals").insert({
-        user_id:userId, agent_id:principal.agentId, action_key:"save_financial_insight",
-        title, description:body, risk_class:"recommendation", autonomy_level:autonomyLevel,
-        reversible:true, payload:{title,body}, rollback_payload:{action:"delete_proposal",execution_key:executionKey},
-        status:"executed", executed_at:new Date().toISOString(), execution_key:executionKey
-      }).select("id,title,description,status,execution_key,executed_at").single();
-      if (error) throw new Error(error.message);
-      await admin.from("lia_action_audit").insert({proposal_id:data.id,user_id:userId,agent_id:principal.agentId,event:"insight_saved",actor:"lia_l3",metadata:{execution_key:executionKey,reversible:true,autonomy_level:autonomyLevel}});
-      return { ...data, reversible:true, autonomous:true, autonomy_level:autonomyLevel };
-    }
-    default:
-      throw new Error(`Outil non implémenté : ${call.name}`);
+    case "get_financial_snapshot": { const projection = await buildLiaFinancialProjection({ supabase, userId, days: 90 }); return { security_level: projection.security_level, account_count: projection.accounts.count, balance_total: projection.accounts.balance_total, transaction_count: projection.transactions.count, income: projection.transactions.income, expenses: projection.transactions.expenses, net: projection.transactions.net, categories: projection.transactions.categories, raw_data_exposed: false, vault_payload_exposed: false }; }
+    case "get_budget_status": { const { data, error } = await supabase.from("budgets").select("id,period_start,period_end,target_end_balance,budget_lines(id,category_id,planned_amount,actual_amount)").eq("user_id", userId).order("period_start", { ascending: false }).limit(3); if (error) throw new Error(error.message); return { budgets: data ?? [], data_available: (data ?? []).length > 0 }; }
+    case "get_cashflow": { const days = Math.min(Math.max(Number(args.days ?? 90), 1), 365); const since = new Date(Date.now() - days * 86400000).toISOString(); const { data, error } = await supabase.from("transactions").select("amount,occurred_at").eq("user_id", userId).gte("occurred_at", since).order("occurred_at", { ascending: true }).limit(1000); if (error) throw new Error(error.message); const rows = data ?? []; const income = rows.filter(r=>Number(r.amount)>0).reduce((s,r)=>s+Number(r.amount),0); const expenses = rows.filter(r=>Number(r.amount)<0).reduce((s,r)=>s+Math.abs(Number(r.amount)),0); return { days, transaction_count: rows.length, income: Number(income.toFixed(2)), expenses: Number(expenses.toFixed(2)), net: Number((income-expenses).toFixed(2)), data_available: rows.length > 0 }; }
+    case "get_wealth_snapshot": { const { data, error } = await supabase.from("wealth_entries").select("*").eq("user_id", userId).order("valuation_date", { ascending: false }).limit(500); if (error) throw new Error(error.message); const rows = data ?? []; return { entry_count: rows.length, entries: rows, data_available: rows.length > 0 }; }
+    case "get_forecast": { const { data, error } = await supabase.from("forecasts").select("horizon,scenario,projected_balance,confidence,assumptions,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(30); if (error) throw new Error(error.message); return { forecast_count: data?.length ?? 0, forecasts: data ?? [], data_available: (data ?? []).length > 0 }; }
+    case "search_transactions": { const query = typeof args.query === "string" ? args.query.trim().slice(0,100) : ""; const limit = Math.min(Math.max(Number(args.limit ?? 50),1),100); let request = supabase.from("transactions").select("id,amount,occurred_at,label,source,category_id,categories(name)").eq("user_id", userId).order("occurred_at",{ascending:false}).limit(limit); if (query) request = request.ilike("label", `%${query}%`); const { data, error } = await request; if (error) throw new Error(error.message); return { query, count: data?.length ?? 0, transactions: data ?? [], data_available: (data ?? []).length > 0 }; }
+    case "create_recommendation": { const title = typeof args.title === "string" ? args.title.slice(0,200) : "Recommandation IA"; const body = typeof args.body === "string" ? args.body.slice(0,10000) : ""; if (!body) throw new Error("Une recommandation doit contenir un contenu."); const { data, error } = await admin.from("lia_action_proposals").insert({ user_id:userId, agent_id:principal.agentId, action_key:"create_recommendation", title, description:body, risk_class:"recommendation", autonomy_level:autonomyLevel, reversible:true, payload:{ title, body }, rollback_payload:{ action:"delete_recommendation_by_proposal" }, status:"proposed", expires_at:new Date(Date.now()+15*60*1000).toISOString() }).select("id,created_at,status").single(); if (error) throw new Error(`Impossible de créer la proposition : ${error.message}`); return { proposal_id:data.id, created_at:data.created_at, status:data.status, requires_human_approval:true }; }
+    case "save_financial_insight": { const title = typeof args.title === "string" ? args.title.slice(0, 200) : "Observation financière"; const body = typeof args.body === "string" ? args.body.slice(0, 5000) : ""; if (!body) throw new Error("Une observation financière doit contenir un contenu."); if (autonomyLevel < 3) throw new Error("Cette action nécessite L3."); const executionKey = createHash("sha256").update(`insight:${userId}:${principal.agentId}:${title}:${body}`).digest("hex").slice(0, 48); const { data: existing } = await admin.from("lia_action_proposals").select("id,status").eq("user_id", userId).eq("execution_key", executionKey).maybeSingle(); if (existing) return { status:"already_executed", execution_key:executionKey, proposal_id:existing.id }; const { data, error } = await admin.from("lia_action_proposals").insert({ user_id:userId, agent_id:principal.agentId, action_key:"save_financial_insight", title, description:body, risk_class:"recommendation", autonomy_level:autonomyLevel, reversible:true, payload:{title,body}, rollback_payload:{action:"delete_proposal",execution_key:executionKey}, status:"executed", executed_at:new Date().toISOString(), execution_key:executionKey }).select("id,title,description,status,execution_key,executed_at").single(); if (error) throw new Error(error.message); await admin.from("lia_action_audit").insert({proposal_id:data.id,user_id:userId,agent_id:principal.agentId,event:"insight_saved",actor:"lia_l3",metadata:{execution_key:executionKey,reversible:true,autonomy_level:autonomyLevel}}); return { ...data, reversible:true, autonomous:true, autonomy_level:autonomyLevel }; }
+    default: throw new Error(`Outil non implémenté : ${call.name}`);
   }
 }
 
-export function toolsForTask(task: string) {
-  switch (task) {
-    case "budget": return ["get_budget_status", "get_cashflow"] as const;
-    case "cashflow": return ["get_cashflow", "get_financial_snapshot"] as const;
-    case "wealth": return ["get_wealth_snapshot", "get_financial_snapshot"] as const;
-    default: return ["get_financial_snapshot", "get_budget_status", "get_cashflow", "get_wealth_snapshot", "get_forecast"] as const;
-  }
-}
+export function toolsForTask(task: string) { switch (task) { case "budget": return ["get_budget_status", "get_cashflow"] as const; case "cashflow": return ["get_cashflow", "get_financial_snapshot"] as const; case "wealth": return ["get_wealth_snapshot", "get_financial_snapshot"] as const; default: return ["get_financial_snapshot", "get_budget_status", "get_cashflow", "get_wealth_snapshot", "get_forecast"] as const; } }

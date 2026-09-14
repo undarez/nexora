@@ -7,23 +7,18 @@ import { chooseNextReasoningStepV2, type ReasoningMemoryV2 } from "@/lib/lia/rea
 import { buildLiaBrainContext, compactBrainContext } from "@/lib/lia/financial-memory/pipeline";
 import { acceptLearningRecord } from "@/lib/lia/cognitive-core";
 import { verifyReadOnlyObservation, summarizeVerifiedObservation } from "@/lib/lia/autonomy/verifier";
+import { AGENT_TOOLS } from "@/lib/agent-runtime/tool-registry";
 
-const READ_ONLY_TOOLS = new Set(["get_financial_snapshot", "get_budget_status", "get_cashflow", "get_wealth_snapshot", "get_forecast", "search_transactions"]);
-const TASK_TOOLS: Record<string, string[]> = {
-  financial_analysis: ["get_financial_snapshot", "get_cashflow", "get_budget_status", "get_forecast", "search_transactions"],
-  budget: ["get_budget_status", "get_cashflow", "search_transactions", "get_financial_snapshot"],
-  cashflow: ["get_cashflow", "get_financial_snapshot", "get_forecast", "search_transactions"],
-  wealth: ["get_wealth_snapshot", "get_financial_snapshot", "get_forecast", "get_cashflow"],
-};
+const AUTONOMOUS_TOOLS = AGENT_TOOLS.filter(tool => tool.risk === "read").map(tool => tool.name);
 export type AutonomousRunResult = { loopRunId: string; status: "completed" | "blocked" | "needs_human" | "failed"; stepsExecuted: number; observations: Array<{ tool: string; ok: boolean }>; nextAction: string; progress: number };
 const inferTask = (context: any) => typeof context?.task === "string" ? context.task : "financial_analysis";
-const safeToolSet = (task: string) => (TASK_TOOLS[task] ?? TASK_TOOLS.financial_analysis).filter(name => READ_ONLY_TOOLS.has(name));
+const safeToolSet = () => [...new Set(AUTONOMOUS_TOOLS)];
 async function persistWorkingState(supabase: SupabaseClient, loopRunId: string, memory: ReasoningMemoryV2, brain: Record<string, unknown> | null, harnessSummary?: Record<string, unknown>) {
   const { data, error } = await supabase.from("agent_loop_runs").select("context").eq("id", loopRunId).single(); if (error) return;
   await supabase.from("agent_loop_runs").update({ context: { ...(data?.context ?? {}), reasoning_memory: memory, brain_context: brain, harness: harnessSummary ?? null } }).eq("id", loopRunId);
 }
 
-/** Persistent bounded agent loop: context -> decide -> act -> verify -> replan -> learn -> memorize. */
+/** Persistent bounded agent loop: goal -> plan -> action -> observation -> verification -> learning -> memory. */
 export async function runAutonomousGoal(supabase: SupabaseClient, userId: string, loopRunId: string, maxSteps = 8): Promise<AutonomousRunResult> {
   const bounded = Math.max(1, Math.min(8, Math.floor(maxSteps)));
   const { data: run, error } = await supabase.from("agent_loop_runs").select("id,user_id,status,goal,context,decision").eq("id", loopRunId).eq("user_id", userId).single();
@@ -34,7 +29,7 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
   if (["completed", "failed", "blocked"].includes(lifecycle.state)) return { loopRunId, status: lifecycle.state as AutonomousRunResult["status"], stepsExecuted: 0, observations: [], nextAction: lifecycle.nextAction, progress: lifecycle.progress };
   if (lifecycle.state === "needs_human") return { loopRunId, status: "needs_human", stepsExecuted: 0, observations: [], nextAction: lifecycle.nextAction, progress: lifecycle.progress };
 
-  const task = inferTask(run.context); const tools = safeToolSet(task);
+  const task = inferTask(run.context); const tools = safeToolSet();
   const brain = await buildLiaBrainContext({ supabase, userId, query: run.goal, loopRunId }); const compactBrain = compactBrainContext(brain) as Record<string, unknown>;
   const previousMemory = run.context?.reasoning_memory as Partial<ReasoningMemoryV2> | undefined;
   const memory: ReasoningMemoryV2 = {
@@ -50,20 +45,20 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
   for (let i = 0; i < bounded; i++) {
     const modelGuard = harness.guard("model", `model:${i}`); if (!modelGuard.allowed) break;
     const modelStarted = Date.now();
-    const remainingSteps = bounded - i;
-    const decision = await chooseNextReasoningStepV2({ goal: run.goal, task, allowedTools: tools, memory, observations: detailed, remainingSteps, durableContext: compactBrain });
+    const decision = await chooseNextReasoningStepV2({ goal: run.goal, task, allowedTools: tools, memory, observations: detailed, remainingSteps: bounded - i, durableContext: compactBrain });
     harness.record({ kind: "model", name: "reasoning-engine-v2", ok: true, startedAt: new Date(modelStarted).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - modelStarted });
     memory.openQuestions = decision.questions; memory.checks = [...memory.checks, ...decision.checks].slice(-20);
-    await recordAgentLoopStep(supabase, loopRunId, 10 + i, { phase: "decide", agentKey: "lia:reasoning-engine-v2", input: { task, allowed_tools: tools, remaining_steps: remainingSteps, memory, durable_context_loaded: true }, output: { action: decision.action, tool: decision.tool, objective: decision.objective, questions: decision.questions, checks: decision.checks, confidence: decision.confidence }, status: "completed" });
+    await recordAgentLoopStep(supabase, loopRunId, 10 + i, { phase: "decide", agentKey: "lia:reasoning-engine-v2", input: { task, allowed_tools: tools, remaining_steps: bounded - i, memory, durable_context_loaded: true }, output: { action: decision.action, tool: decision.tool, objective: decision.objective, questions: decision.questions, checks: decision.checks, confidence: decision.confidence }, status: "completed" });
     await persistWorkingState(supabase, loopRunId, memory, compactBrain, harness.summary());
 
     if (decision.action === "needs_human") { current = advanceGoalLifecycle(current, "needs_human", decision.objective || "Une validation humaine est nécessaire.", { completedStep: "reasoning_human_gate" }); await persistGoalLifecycle(supabase, loopRunId, current); harness.complete("blocked", "validation_humaine"); return { loopRunId, status: "needs_human", stepsExecuted: observations.length, observations, nextAction: current.nextAction, progress: current.progress }; }
     if (decision.action === "finish" || !decision.tool) break;
-    const tool = decision.tool; const toolGuard = harness.guard("tool", `tool:${tool}`); if (!toolGuard.allowed) { memory.replans += 1; break; }
-    current = advanceGoalLifecycle(current, "executing", decision.objective, { completedStep: `reasoning_select:${tool}` }); await persistGoalLifecycle(supabase, loopRunId, current);
-    const started = Date.now(); const stepId = await recordAgentLoopStep(supabase, loopRunId, 30 + i, { phase: "act", agentKey: "lia:autonomous-runner", input: { tool, risk: "read", autonomous: true, objective: decision.objective }, output: { pending: true }, status: "completed" });
+    const tool = decision.tool; const toolGuard = harness.guard("tool", `tool:${tool}`); if (!toolGuard.allowed || !tools.includes(tool)) { memory.replans += 1; break; }
+    current = advanceGoalLifecycle(current, tool === "research_web" ? "researching" : "executing", decision.objective, { completedStep: `reasoning_select:${tool}` }); await persistGoalLifecycle(supabase, loopRunId, current);
+    const started = Date.now(); const stepId = await recordAgentLoopStep(supabase, loopRunId, 30 + i, { phase: tool === "research_web" ? "observe" : "act", agentKey: "lia:autonomous-runner", input: { tool, risk: "read", autonomous: true, objective: decision.objective }, output: { pending: true }, status: "completed" });
     try {
-      const result = await executeAgentTool(supabase, userId, { name: tool }, { runId: loopRunId, stepId });
+      const args = tool === "research_web" ? { query: run.goal, max_sources: 4, timeout_ms: 8000, discover: true } : {};
+      const result = await executeAgentTool(supabase, userId, { name: tool, arguments: args }, { runId: loopRunId, stepId });
       const verification = verifyReadOnlyObservation(result, detailed); const summary = summarizeVerifiedObservation(result); const ok = verification.passed;
       observations.push({ tool, ok }); detailed.push({ tool, ok, summary }); harness.record({ kind: "tool", name: tool, ok, startedAt: new Date(started).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - started, fingerprint: `tool:${tool}` });
       memory.completedTools.push(tool); memory.facts.push(`${tool}: ${summary.slice(0, 900)}`); memory.verifiedObservations += ok ? 1 : 0; memory.checks.push(...verification.checks.map(c => `${c.key}: ${c.observed ? "ok" : "failed"}`)); if (!ok) memory.replans += 1;
