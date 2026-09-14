@@ -13,11 +13,11 @@ export async function POST(request: Request) {
   try { body = await request.json(); } catch {}
   const loopRunId = typeof body.loopRunId === "string" ? body.loopRunId : "";
   if (!loopRunId) return NextResponse.json({ error: "loopRunId requis." }, { status: 400 });
-  const maxSteps = Number(body.maxSteps ?? 3);
-  if (!Number.isFinite(maxSteps) || maxSteps < 1 || maxSteps > 5) return NextResponse.json({ error: "maxSteps doit être compris entre 1 et 5." }, { status: 400 });
+  const maxSteps = Number(body.maxSteps ?? 8);
+  if (!Number.isFinite(maxSteps) || maxSteps < 1 || maxSteps > 8) return NextResponse.json({ error: "maxSteps doit être compris entre 1 et 8." }, { status: 400 });
   try {
     const result = await runAutonomousGoal(supabase, user.id, loopRunId, maxSteps);
-    return NextResponse.json({ ok: true, runner: result, governance: { autonomousWritesAllowed: false, criticalActionsRequireHuman: true, maxSteps: Math.min(5, Math.floor(maxSteps)) } });
+    return NextResponse.json({ ok: true, runner: result, governance: { autonomousWritesAllowed: false, criticalActionsRequireHuman: true, maxSteps: Math.min(8, Math.floor(maxSteps)), durableMemory: true, verification: true, learning: true, autonomousContinuation: true } });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Runner LIA indisponible." }, { status: 409 });
   }
