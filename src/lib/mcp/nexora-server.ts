@@ -1,0 +1,98 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { McpServer } from "@modelcontextprotocol/server";
+import * as z from "zod/v4";
+import { executeAgentTool } from "@/lib/agent-runtime/executor";
+import { getLiaRuntimeControls } from "@/lib/lia/runtime/controls";
+
+export async function createNexoraMcpServer(supabase: SupabaseClient, userId: string) {
+  const controls = await getLiaRuntimeControls(supabase);
+  if (!controls.ai_enabled) throw new Error("lia_disabled");
+
+  const server = new McpServer(
+    {
+      name: "nexora-lia",
+      title: "NEXORA LIA",
+      version: "1.0.0",
+      description: "NEXORA finance agent tool gateway. All actions remain subject to NEXORA policy, autonomy and decision gates.",
+    },
+    { capabilities: { tools: {} } },
+  );
+
+  const call = async (name: string, args: Record<string, unknown>) => {
+    const result = await executeAgentTool(supabase, userId, { name, arguments: args });
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(result) }],
+      structuredContent: result,
+    };
+  };
+
+  server.registerTool("get_financial_snapshot", {
+    title: "Lire le snapshot financier",
+    description: "Retourne un résumé financier non sensible et sans données de coffre.",
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async () => call("get_financial_snapshot", {}));
+
+  server.registerTool("get_budget_status", {
+    title: "Lire les budgets",
+    description: "Retourne les budgets récents et leur état réel.",
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async () => call("get_budget_status", {}));
+
+  server.registerTool("get_cashflow", {
+    title: "Lire le cash-flow",
+    description: "Calcule les flux observés sur une période bornée.",
+    inputSchema: { days: z.number().int().min(1).max(365).optional() },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async ({ days }) => call("get_cashflow", { days: days ?? 90 }));
+
+  server.registerTool("get_wealth_snapshot", {
+    title: "Lire le patrimoine",
+    description: "Retourne les entrées de patrimoine déjà persistées.",
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async () => call("get_wealth_snapshot", {}));
+
+  server.registerTool("get_forecast", {
+    title: "Lire les prévisions",
+    description: "Retourne les prévisions persistées et leurs scénarios.",
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async () => call("get_forecast", {}));
+
+  server.registerTool("search_transactions", {
+    title: "Rechercher des transactions",
+    description: "Recherche des transactions appartenant à l'utilisateur authentifié.",
+    inputSchema: { query: z.string().max(100).optional(), limit: z.number().int().min(1).max(100).optional() },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async ({ query, limit }) => call("search_transactions", { query: query ?? "", limit: limit ?? 50 }));
+
+  server.registerTool("search_skills", {
+    title: "Rechercher les Skills LIA",
+    description: "Recherche les Skills procéduraux validés disponibles pour la tâche.",
+    inputSchema: { query: z.string().max(200).optional(), category: z.string().max(60).optional(), limit: z.number().int().min(1).max(20).optional() },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async ({ query, category, limit }) => call("search_skills", { query: query ?? "", category, limit: limit ?? 8 }));
+
+  server.registerTool("learn_skill", {
+    title: "Mémoriser un Skill candidat",
+    description: "Crée un Skill candidat réutilisable. L'activation reste séparée et gouvernée.",
+    inputSchema: {
+      name: z.string().min(1).max(120),
+      description: z.string().min(1).max(500),
+      procedure: z.string().min(20).max(12000),
+      category: z.string().max(60).optional(),
+      expected_result: z.string().max(1000).optional(),
+      verification_steps: z.array(z.string().max(500)).max(10).optional(),
+      source_refs: z.array(z.string().max(500)).max(10).optional(),
+      correction: z.string().max(5000).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  }, async (args) => call("learn_skill", args));
+
+  server.registerTool("create_recommendation", {
+    title: "Créer une recommandation",
+    description: "Crée une proposition de recommandation soumise aux gates NEXORA. Ne réalise pas l'action financière elle-même.",
+    inputSchema: { title: z.string().min(1).max(200), body: z.string().min(1).max(10000) },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  }, async ({ title, body }) => call("create_recommendation", { title, body }));
+
+  return server;
+}
