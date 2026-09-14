@@ -7,6 +7,7 @@ import { chooseNextReasoningStepV2, type ReasoningMemoryV2 } from "@/lib/lia/rea
 import { buildLiaBrainContext, compactBrainContext } from "@/lib/lia/financial-memory/pipeline";
 import { acceptLearningRecord } from "@/lib/lia/cognitive-core";
 import { verifyReadOnlyObservation, summarizeVerifiedObservation } from "@/lib/lia/autonomy/verifier";
+import { runOppositionLearning } from "@/lib/lia/opposition-learning";
 import { AGENT_TOOLS } from "@/lib/agent-runtime/tool-registry";
 
 const AUTONOMOUS_TOOLS = AGENT_TOOLS.filter(tool => tool.risk === "read").map(tool => tool.name);
@@ -18,7 +19,7 @@ async function persistWorkingState(supabase: SupabaseClient, loopRunId: string, 
   await supabase.from("agent_loop_runs").update({ context: { ...(data?.context ?? {}), reasoning_memory: memory, brain_context: brain, harness: harnessSummary ?? null } }).eq("id", loopRunId);
 }
 
-/** Persistent bounded agent loop: goal -> plan -> action -> observation -> verification -> learning -> memory. */
+/** Persistent bounded agent loop: goal -> plan -> action -> observation -> verification -> opposition -> learning -> memory. */
 export async function runAutonomousGoal(supabase: SupabaseClient, userId: string, loopRunId: string, maxSteps = 8): Promise<AutonomousRunResult> {
   const bounded = Math.max(1, Math.min(8, Math.floor(maxSteps)));
   const { data: run, error } = await supabase.from("agent_loop_runs").select("id,user_id,status,goal,context,decision").eq("id", loopRunId).eq("user_id", userId).single();
@@ -74,13 +75,20 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
   const successCount = observations.filter(x => x.ok).length;
   if (observations.length > 0 && successCount === 0) { current = advanceGoalLifecycle(current, "blocked", "attendre la disponibilité des outils de lecture", { blocker: "Aucune observation déterministe n'a pu être vérifiée." }); await persistGoalLifecycle(supabase, loopRunId, current); harness.complete("blocked", "aucune_observation_verifiee"); return { loopRunId, status: "blocked", stepsExecuted: observations.length, observations, nextAction: current.nextAction, progress: current.progress }; }
 
-  current = advanceGoalLifecycle(current, "learning", "consolider uniquement les observations vérifiées", { completedStep: "learning_from_verified_observations" }); await persistGoalLifecycle(supabase, loopRunId, current);
+  current = advanceGoalLifecycle(current, "learning", "faire relire les preuves par l'Analyste puis le Contradicteur avant arbitrage", { completedStep: "opposition_review_started" }); await persistGoalLifecycle(supabase, loopRunId, current);
+  const opposition = await runOppositionLearning({ goal: run.goal, evidence: detailed, priorFacts: memory.facts });
+  await recordAgentLoopStep(supabase, loopRunId, 50, { phase: "opposition", agentKey: "lia:opposition-learning", input: { evidence_count: detailed.length, security: opposition.security }, output: { analyst: opposition.analyst, challenger: opposition.challenger, arbiter: opposition.arbiter }, status: opposition.security.passed ? "completed" : "failed" });
+  memory.checks.push(...opposition.security.checks.map(check => `opposition_security:${check}`));
+  memory.facts.push(`opposition:${opposition.arbiter.verdict} (${opposition.arbiter.confidence.toFixed(2)}): ${opposition.arbiter.reasons.join(" ")}`);
+  await recordEvidence(supabase, loopRunId, "opposition:arbiter", "adversarial_review", opposition, 50);
+  await persistWorkingState(supabase, loopRunId, memory, compactBrain, harness.summary());
+
   try {
-    if (successCount >= 2 && memory.verifiedObservations >= 2) await acceptLearningRecord(supabase, userId, { loopRunId, lesson: `La boucle ${task} peut s'appuyer sur des observations déterministes vérifiées avant de conclure.`, context: { task, tools, durable_memory_used: true }, action: { tools_used: observations.map(o => o.tool) }, expectedResult: { at_least_two_verified_observations: true }, actualResult: { verified_observations: memory.verifiedObservations }, validation: { checks: memory.checks.slice(-12), source: "autonomous_verifier" }, confidence: 75, reproducible: true, memoryType: "procedural", topic: `Procédure vérifiée: ${task}` });
+    if (successCount >= 2 && memory.verifiedObservations >= 2 && opposition.arbiter.verdict === "supported" && opposition.security.passed) await acceptLearningRecord(supabase, userId, { loopRunId, lesson: `La boucle ${task} doit confronter une hypothèse à un contradicteur avant de consolider une procédure.`, context: { task, tools, durable_memory_used: true, opposition_verdict: opposition.arbiter.verdict }, action: { tools_used: observations.map(o => o.tool), opposition_reviewed: true }, expectedResult: { at_least_two_verified_observations: true, adversarial_review: "supported" }, actualResult: { verified_observations: memory.verifiedObservations, opposition_verdict: opposition.arbiter.verdict }, validation: { checks: memory.checks.slice(-16), source: "autonomous_verifier+opposition_arbiter" }, confidence: Math.round(opposition.arbiter.confidence * 100), reproducible: true, memoryType: "procedural", topic: `Procédure contradictoire vérifiée: ${task}` });
   } catch (error) { memory.checks.push(`learning_persistence_failed: ${error instanceof Error ? error.message.slice(0, 180) : "unknown"}`); }
 
   current = advanceGoalLifecycle(current, "memorizing", "mettre à jour la mémoire gouvernée et préparer la prochaine réévaluation", { completedStep: "memory_consolidation" }); await persistGoalLifecycle(supabase, loopRunId, current); harness.complete("completed"); await persistWorkingState(supabase, loopRunId, memory, compactBrain, harness.summary());
-  current = advanceGoalLifecycle(current, "completed", "réévaluer automatiquement si les données ou le contexte changent", { completedStep: "reasoning_completed", result: { observations: successCount, failed_observations: observations.length - successCount, reasoning_steps: detailed.length, replans: memory.replans, verified_observations: memory.verifiedObservations, harness: harness.summary(), recommendation_only: true, autonomous_writes_allowed: false } });
+  current = advanceGoalLifecycle(current, "completed", "réévaluer automatiquement si les données ou le contexte changent", { completedStep: "reasoning_completed", result: { observations: successCount, failed_observations: observations.length - successCount, reasoning_steps: detailed.length, replans: memory.replans, verified_observations: memory.verifiedObservations, opposition: opposition.arbiter, harness: harness.summary(), recommendation_only: true, autonomous_writes_allowed: false } });
   await persistGoalLifecycle(supabase, loopRunId, current);
   return { loopRunId, status: "completed", stepsExecuted: observations.length, observations, nextAction: current.nextAction, progress: current.progress };
 }
