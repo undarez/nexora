@@ -13,7 +13,7 @@ function authorized(request:Request){const configured=process.env.LIA_CRON_SECRE
 export async function POST(request:Request){
  if(!authorized(request))return NextResponse.json({error:"Cron non autorisé."},{status:401});
  try{
-  const supabase=admin(); const now=new Date(); const controls=await getLiaRuntimeControls();
+  const supabase=admin(); const now=new Date(); const controls=await getLiaRuntimeControls(supabase);
   if(!controls.cron_autonomy_enabled)return NextResponse.json({now:now.toISOString(),processed:0,paused:true,reason:"admin_global_kill_switch"});
   const {data:jobs,error}=await supabase.from("lia_runtime_jobs").select("id,user_id,name,schedule,status,payload,next_run_at,last_run_at,timezone,failure_count").eq("runtime_type","cron").eq("status","ready").eq("admin_disabled",false).not("schedule","is",null).or(`next_run_at.is.null,next_run_at.lte.${now.toISOString()}`).order("next_run_at",{ascending:true}).limit(20); if(error)throw new Error(error.message);
   const results:Array<Record<string,unknown>>=[];
