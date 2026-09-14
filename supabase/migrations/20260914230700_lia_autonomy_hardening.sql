@@ -1,6 +1,6 @@
 -- NEXORA LIA autonomy hardening: dynamic read-only web capability + lifecycle reconciliation.
 insert into public.lia_tool_policies (tool_key, risk_level, min_autonomy_level, human_approval_required, reversible, enabled, policy)
-values ('research_web', 'low', 0, false, true, true, jsonb_build_object('read_only', true, 'trusted_domains_only', true, 'activation_allowed', false, 'max_sources', 6, 'max_timeout_ms', 12000))
+values ('research_web', 'read', 0, false, true, true, jsonb_build_object('read_only', true, 'trusted_domains_only', true, 'activation_allowed', false, 'max_sources', 6, 'max_timeout_ms', 12000))
 on conflict (tool_key) do update set risk_level=excluded.risk_level, min_autonomy_level=excluded.min_autonomy_level, human_approval_required=excluded.human_approval_required, reversible=excluded.reversible, enabled=excluded.enabled, policy=excluded.policy, updated_at=now();
 
 -- Repair historical lifecycle/status contradictions without changing business facts.
@@ -18,18 +18,13 @@ completed_at = case
 end
 where context ? 'goal_lifecycle';
 
--- Mark very old unfinished runs as blocked rather than leaving them permanently "running".
--- This only affects runs with no terminal lifecycle and no recent step activity.
 with stale as (
   select r.id
   from public.agent_loop_runs r
   where r.status='running'
     and coalesce(r.context->'goal_lifecycle'->>'state','objective') not in ('completed','failed','blocked','needs_human')
     and r.created_at < now() - interval '2 hours'
-    and not exists (
-      select 1 from public.agent_loop_steps s
-      where s.loop_run_id=r.id and s.created_at > now() - interval '30 minutes'
-    )
+    and not exists (select 1 from public.agent_loop_steps s where s.loop_run_id=r.id and s.created_at > now() - interval '30 minutes')
 )
 update public.agent_loop_runs r
 set status='blocked', completed_at=coalesce(r.completed_at, now()),
