@@ -14,7 +14,7 @@ export const legalConfig = {
   dpoEmail: process.env.NEXT_PUBLIC_DPO_EMAIL || "[EMAIL DPO / POINT DE CONTACT RGPD À COMPLÉTER]",
   mediationName: process.env.NEXT_PUBLIC_MEDIATOR_NAME || "[MÉDIATEUR DE LA CONSOMMATION À DÉSIGNER AVANT COMMERCIALISATION]",
   mediationUrl: process.env.NEXT_PUBLIC_MEDIATOR_URL || "[URL DU MÉDIATEUR À COMPLÉTER]",
-  lastUpdated: "8 septembre 2026",
+  lastUpdated: "14 septembre 2026",
 };
 
-export const legalPlaceholder = "Les éléments entre crochets doivent être complétés avec les informations juridiques réelles de l’éditeur avant toute mise en production commerciale.";
+export const legalPlaceholder = "Les informations d’identification de l’éditeur doivent provenir de la configuration juridique réelle avant une mise en production commerciale.";
