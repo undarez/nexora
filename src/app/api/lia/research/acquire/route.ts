@@ -9,7 +9,7 @@ import {getLiaRuntimeControls} from "@/lib/lia/runtime/controls";
 export async function POST(request:Request){
  try{assertSameOrigin(request)}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"forbidden"},{status:403})}
  const supabase=await createClient(); if(!supabase)return NextResponse.json({error:"supabase_not_configured"},{status:503}); const {data:{user}}=await supabase.auth.getUser(); if(!user)return NextResponse.json({error:"unauthorized"},{status:401});
- const runtimeControls=await getLiaRuntimeControls(); if(!runtimeControls.web_research_enabled)return NextResponse.json({error:"La recherche Internet LIA est temporairement désactivée par l’administration.",code:"WEB_RESEARCH_DISABLED"},{status:503});
+ const runtimeControls=await getLiaRuntimeControls(supabase); if(!runtimeControls.web_research_enabled)return NextResponse.json({error:"La recherche Internet LIA est temporairement désactivée par l’administration.",code:"WEB_RESEARCH_DISABLED"},{status:503});
  const body=await request.json().catch(()=>null) as {url?:unknown;maxBytes?:unknown;timeoutMs?:unknown;maxRedirects?:unknown}|null;
  if(!body||typeof body.url!=="string"||!body.url.trim())return NextResponse.json({error:"url_required"},{status:400});
  try{
