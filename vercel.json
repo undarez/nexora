@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/lia/runtime/cron", "schedule": "0 8 * * *" },
+    { "path": "/api/lia/runtime/cron", "schedule": "0 20 * * *" }
+  ]
+}
