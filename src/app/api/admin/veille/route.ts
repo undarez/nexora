@@ -5,20 +5,25 @@ import { getAdminContext } from "@/lib/auth/admin";
 import { assertSameOrigin } from "@/lib/security/csrf";
 
 export async function GET() {
-  const supabase = await createClient();
-  if (!supabase) return NextResponse.json({ error: "Supabase non configuré." }, { status: 503 });
-  const { user, isAdmin } = await getAdminContext(supabase);
-  if (!user || !isAdmin) return NextResponse.json({ error: "Accès administrateur requis." }, { status: 403 });
-  const admin = getSupabaseAdmin();
-  if (!admin) return NextResponse.json({ error: "Secret serveur non configuré." }, { status: 503 });
-  const [knowledge, skills, research] = await Promise.all([
-    admin.from("financial_knowledge_items").select("id,knowledge_key,title,statement,authority,confidence,status,tags,created_at,updated_at").order("updated_at", { ascending: false }).limit(80),
-    admin.from("lia_skills").select("id,name,slug,description,category,status,source_type,trust_score,use_count,success_count,failure_count,updated_at").order("updated_at", { ascending: false }).limit(80),
-    admin.from("lia_research_runs").select("id,query,minimum_evidence_met,knowledge_graph_ready,created_at").order("created_at", { ascending: false }).limit(30),
-  ]);
-  const error = knowledge.error || skills.error || research.error;
-  if (error) return NextResponse.json({ error: error.message }, { status: 503 });
-  return NextResponse.json({ knowledge: knowledge.data ?? [], skills: skills.data ?? [], research: research.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+  try {
+    const supabase = await createClient();
+    if (!supabase) return NextResponse.json({ error: "Supabase non configuré." }, { status: 503 });
+    const { user, isAdmin } = await getAdminContext(supabase);
+    if (!user || !isAdmin) return NextResponse.json({ error: "Accès administrateur requis." }, { status: 403 });
+    const admin = getSupabaseAdmin();
+    if (!admin) return NextResponse.json({ error: "Secret serveur non configuré." }, { status: 503 });
+    const [knowledge, skills, research] = await Promise.all([
+      admin.from("financial_knowledge_items").select("id,knowledge_key,title,statement,authority,confidence,status,tags,created_at,updated_at").order("updated_at", { ascending: false }).limit(80),
+      admin.from("lia_skills").select("id,name,slug,description,category,status,source_type,trust_score,use_count,success_count,failure_count,updated_at").order("updated_at", { ascending: false }).limit(80),
+      admin.from("lia_research_runs").select("id,query,minimum_evidence_met,knowledge_graph_ready,created_at").order("created_at", { ascending: false }).limit(30),
+    ]);
+    const error = knowledge.error || skills.error || research.error;
+    if (error) return NextResponse.json({ error: error.message }, { status: 503 });
+    return NextResponse.json({ knowledge: knowledge.data ?? [], skills: skills.data ?? [], research: research.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+  } catch (e) {
+    console.error("[admin/veille] GET failed", e);
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Impossible de charger la veille." }, { status: 500, headers: { "Cache-Control": "no-store" } });
+  }
 }
 
 export async function POST(request: Request) {
