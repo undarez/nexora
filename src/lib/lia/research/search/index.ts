@@ -4,6 +4,7 @@ export type SearchResult = { title:string; url:string; snippet?:string; publishe
 export type SearchProvider = { name:string; search(query:string, limit:number):Promise<SearchResult[]> };
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
 const cleanUrl=(raw:string)=>{try{const u=new URL(raw);if(!["https:","http:"].includes(u.protocol)||u.username||u.password)return null;return u.toString();}catch{return null;}};
+const stripHtml=(value:string)=>value.replace(/<[^>]+>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#x27;/g,"'").replace(/&#39;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/\s+/g," ").trim();
 
 class BraveProvider implements SearchProvider {
  name="brave";
@@ -28,8 +29,25 @@ class DuckDuckGoWorker implements SearchProvider {
    if(results.length>=clamp(limit,1,8))break;
    let raw=match[1];try{const decoded=decodeURIComponent(raw);const uddg=decoded.match(/[?&]uddg=([^&]+)/);if(uddg)raw=decodeURIComponent(uddg[1]);}catch{}
    const u=cleanUrl(raw);if(!u)continue;
-   const text=(value:string)=>value.replace(/<[^>]+>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#x27;/g,"'").replace(/\s+/g," ").trim();
-   results.push({title:text(match[2]),url:u,snippet:match[3]?text(match[3]):undefined,provider:this.name});
+   results.push({title:stripHtml(match[2]),url:u,snippet:match[3]?stripHtml(match[3]):undefined,provider:this.name});
+  }
+  return results;
+ }
+}
+
+/** Keyless fallback used only when the primary search providers are unavailable. */
+class BingWorker implements SearchProvider {
+ name="web-cage-bing";
+ async search(query:string,limit:number){
+  const url=new URL("https://www.bing.com/search");url.searchParams.set("q",query);url.searchParams.set("count",String(clamp(limit,1,8)));url.searchParams.set("setlang","fr-FR");
+  const r=await fetch(url,{headers:{Accept:"text/html","User-Agent":"NEXORA-LIA-WebWorker/1.0"},signal:AbortSignal.timeout(8000)});
+  if(!r.ok)throw new Error(`bing_search_upstream_${r.status}`);
+  const html=(await r.text()).slice(0,900_000);const results:SearchResult[]=[];
+  const re=/<li[^>]+class=["'][^"']*b_algo[^"']*["'][^>]*>[\s\S]*?<h2[^>]*>\s*<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:<p[^>]*>([\s\S]*?)<\/p>)?[\s\S]*?<\/li>/gi;
+  for(const match of html.matchAll(re)){
+   if(results.length>=clamp(limit,1,8))break;
+   const u=cleanUrl(match[1]);if(!u)continue;
+   results.push({title:stripHtml(match[2]),url:u,snippet:match[3]?stripHtml(match[3]):undefined,provider:this.name});
   }
   return results;
  }
@@ -42,6 +60,7 @@ function configuredProviders():SearchProvider[]{
  if(selected==="brave"||selected==="auto")providers.push(new BraveProvider());
  if(selected==="tavily"||selected==="auto")providers.push(new TavilyProvider());
  if(selected==="web-cage"||selected==="auto")providers.push(new DuckDuckGoWorker());
+ if(selected==="bing"||selected==="auto")providers.push(new BingWorker());
  if(!providers.length)throw new Error("unknown_search_provider");
  return providers;
 }
