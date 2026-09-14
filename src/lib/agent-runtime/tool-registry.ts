@@ -1,12 +1,5 @@
 export type AgentToolRisk = "read" | "recommendation" | "write-sensitive";
-
-export type AgentToolDefinition = {
-  name: string;
-  description: string;
-  risk: AgentToolRisk;
-  deterministic: boolean;
-  requiresUserApproval: boolean;
-};
+export type AgentToolDefinition = { name: string; description: string; risk: AgentToolRisk; deterministic: boolean; requiresUserApproval: boolean };
 
 export const AGENT_TOOLS: AgentToolDefinition[] = [
   { name: "get_financial_snapshot", description: "Lire le snapshot financier de l'utilisateur authentifié.", risk: "read", deterministic: true, requiresUserApproval: false },
@@ -21,8 +14,7 @@ export const AGENT_TOOLS: AgentToolDefinition[] = [
   { name: "learn_skill", description: "Transformer une procédure validée ou une correction en skill candidat réutilisable.", risk: "recommendation", deterministic: true, requiresUserApproval: false },
   { name: "create_recommendation", description: "Proposer une recommandation vérifiée ; exécution persistante soumise à validation humaine.", risk: "recommendation", deterministic: true, requiresUserApproval: true },
   { name: "save_financial_insight", description: "Enregistrer une observation financière non transactionnelle et réversible.", risk: "recommendation", deterministic: true, requiresUserApproval: false },
+  { name: "create_cron_job", description: "Planifier une boucle LIA bornée pour une action de lecture gouvernée.", risk: "recommendation", deterministic: true, requiresUserApproval: false },
 ];
 
-export function getAgentTool(name: string) {
-  return AGENT_TOOLS.find((tool) => tool.name === name);
-}
+export function getAgentTool(name: string) { return AGENT_TOOLS.find((tool) => tool.name === name); }
