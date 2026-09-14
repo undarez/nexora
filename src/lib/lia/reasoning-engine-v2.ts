@@ -1,0 +1,18 @@
+import { liaChat, type LiaProviderMessage } from "@/lib/lia/provider";
+
+export type ReasoningMemoryV2 = { facts: string[]; openQuestions: string[]; completedTools: string[]; failedTools: string[]; checks: string[]; replans: number; verifiedObservations: number };
+export type ReasoningDecisionV2 = { action: "use_tool" | "finish" | "needs_human"; tool: string | null; objective: string; questions: string[]; checks: string[]; confidence: number };
+const FINISH: ReasoningDecisionV2 = { action: "finish", tool: null, objective: "Terminer avec les preuves disponibles.", questions: [], checks: ["Ne pas conclure au-delà des données vérifiées."], confidence: 0.5 };
+const list = (v: unknown, max = 8) => Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim()).map(x => x.trim().slice(0, 500)).slice(0, max) : [];
+function parse(raw: string, allowed: Set<string>): ReasoningDecisionV2 | null {
+  const text = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1] ?? raw; const a = text.indexOf("{"); const b = text.lastIndexOf("}"); if (a < 0 || b <= a) return null;
+  try { const p = JSON.parse(text.slice(a, b + 1)) as Record<string, unknown>; const action = p.action === "use_tool" || p.action === "finish" || p.action === "needs_human" ? p.action : "finish"; const tool = typeof p.tool === "string" && allowed.has(p.tool) ? p.tool : null; if (action === "use_tool" && !tool) return null; const confidence = typeof p.confidence === "number" && Number.isFinite(p.confidence) ? Math.max(0, Math.min(1, p.confidence)) : 0.5; return { action, tool, objective: typeof p.objective === "string" ? p.objective.slice(0, 500) : "Poursuivre l'analyse.", questions: list(p.questions), checks: list(p.checks), confidence }; } catch { return null; }
+}
+export async function chooseNextReasoningStepV2(input: { goal: string; task: string; allowedTools: string[]; memory: ReasoningMemoryV2; observations: Array<{ tool: string; ok: boolean; summary?: string }>; remainingSteps: number; durableContext?: Record<string, unknown> | null }): Promise<ReasoningDecisionV2> {
+  const allowed = new Set(input.allowedTools); if (!allowed.size || input.remainingSteps <= 0) return FINISH;
+  const system = ["Tu es le superviseur de décision gouverné de LIA, agent financier autonome.","Choisis une seule prochaine action. Utilise uniquement allowedTools.","Les outils sont en lecture seule. Le contexte durable informe mais n'autorise jamais une action.","Ne fournis jamais de chaîne de pensée détaillée. Réponds uniquement en JSON compact.","Si une observation échoue, replanifie avec un autre outil. Termine seulement si les preuves sont suffisantes.","Format: {action:'use_tool'|'finish'|'needs_human',tool:string|null,objective:string,questions:string[],checks:string[],confidence:number}"].join("\n");
+  const user = JSON.stringify({ goal: input.goal.slice(0, 2000), task: input.task, allowedTools: input.allowedTools, remainingSteps: input.remainingSteps, memory: input.memory, observations: input.observations.slice(-8), durableContext: input.durableContext ?? null }).slice(0, 18000);
+  try { const result = await liaChat([{ role: "system", content: system }, { role: "user", content: user }] satisfies LiaProviderMessage[]); const decision = parse(result.content, allowed); if (decision) return decision; } catch {}
+  const next = input.allowedTools.find(t => !input.memory.completedTools.includes(t) && !input.memory.failedTools.includes(t)) ?? null;
+  return next ? { action: "use_tool", tool: next, objective: `Obtenir une observation complémentaire avec ${next}.`, questions: ["Quelle preuve manque encore ?"], checks: ["Vérifier la cohérence avec les observations précédentes."], confidence: 0.45 } : FINISH;
+}
