@@ -79,10 +79,10 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
 
   current = advanceGoalLifecycle(current, "learning", "faire relire les preuves par l'Analyste puis le Contradicteur avant arbitrage", { completedStep: "opposition_review_started" }); await persistGoalLifecycle(supabase, loopRunId, current);
   const opposition = await runOppositionLearning({ goal: run.goal, evidence: detailed, priorFacts: memory.facts });
-  await recordAgentLoopStep(supabase, loopRunId, 50, { phase: "opposition", agentKey: "lia:opposition-learning", input: { evidence_count: detailed.length, security: opposition.security }, output: { analyst: opposition.analyst, challenger: opposition.challenger, arbiter: opposition.arbiter }, status: opposition.security.passed ? "completed" : "failed" });
+  const oppositionStepId = await recordAgentLoopStep(supabase, loopRunId, 50, { phase: "learn", agentKey: "lia:opposition-learning", input: { evidence_count: detailed.length, security: opposition.security }, output: { analyst: opposition.analyst, challenger: opposition.challenger, arbiter: opposition.arbiter }, status: opposition.security.passed ? "completed" : "failed" });
   memory.checks.push(...opposition.security.checks.map(check => `opposition_security:${check}`));
   memory.facts.push(`opposition:${opposition.arbiter.verdict} (${opposition.arbiter.confidence.toFixed(2)}): ${opposition.arbiter.reasons.join(" ")}`);
-  await recordEvidence(supabase, loopRunId, "opposition:arbiter", "adversarial_review", opposition, 50);
+  await recordEvidence(supabase, loopRunId, "opposition:arbiter", "adversarial_review", opposition, oppositionStepId);
   await persistWorkingState(supabase, loopRunId, memory, compactBrain, harness.summary(), { recalled: durableMemory.compact, count: durableMemory.recalled.length, loaded_at: durableMemory.loadedAt });
 
   try {
