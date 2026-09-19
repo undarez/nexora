@@ -8,3 +8,8 @@ assert.ok(source.includes('status: result.step.status'), 'trace must expose actu
 assert.ok(source.includes('depends_on'), 'runtime must enforce task dependencies');
 assert.ok(source.includes('agent_key'), 'runtime must carry governed agent lane');
 console.log('✓ orchestrator runtime contract');
+
+assert.ok(source.includes('replanLiaOrchestration'), 'runtime must support governed replanning');
+assert.ok(source.includes('replan_budget_exhausted'), 'replanning must have a hard budget');
+assert.ok(source.includes('excludeProcedureSlugs'), 'replanning must avoid the failed procedure');
+assert.ok(source.includes('plan_version'), 'replanning must version the task graph');
