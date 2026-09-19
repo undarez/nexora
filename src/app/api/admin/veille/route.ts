@@ -12,14 +12,20 @@ export async function GET() {
     if (!user || !isAdmin) return NextResponse.json({ error: "Accès administrateur requis." }, { status: 403 });
     const admin = getSupabaseAdmin();
     if (!admin) return NextResponse.json({ error: "Secret serveur non configuré." }, { status: 503 });
-    const [knowledge, skills, research] = await Promise.all([
+    const monthStart = new Date(); monthStart.setUTCDate(1); const month = monthStart.toISOString().slice(0, 10);
+    const [knowledge, skills, research, providerUsage] = await Promise.all([
       admin.from("financial_knowledge_items").select("id,knowledge_key,title,statement,authority,confidence,status,tags,created_at,updated_at").order("updated_at", { ascending: false }).limit(80),
       admin.from("lia_skills").select("id,name,slug,description,category,status,source_type,trust_score,use_count,success_count,failure_count,updated_at").order("updated_at", { ascending: false }).limit(80),
       admin.from("lia_research_runs").select("id,query,minimum_evidence_met,knowledge_graph_ready,created_at").order("created_at", { ascending: false }).limit(30),
+      admin.from("lia_research_provider_usage").select("provider,month_start,search_count,estimated_credits,last_used_at,updated_at").eq("month_start", month).order("provider"),
     ]);
-    const error = knowledge.error || skills.error || research.error;
+    const error = knowledge.error || skills.error || research.error || providerUsage.error;
     if (error) return NextResponse.json({ error: error.message }, { status: 503 });
-    return NextResponse.json({ knowledge: knowledge.data ?? [], skills: skills.data ?? [], research: research.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    const tavily = (providerUsage.data ?? []).find((item: any) => item.provider === "tavily") ?? null;
+    const monthlyCredits = Number(process.env.TAVILY_MONTHLY_CREDITS || 1000);
+    const guardPercent = Number(process.env.TAVILY_USAGE_GUARD_PERCENT || 90);
+    const guardLimit = Math.max(1, Math.floor(monthlyCredits * Math.min(100, Math.max(1, guardPercent)) / 100));
+    return NextResponse.json({ knowledge: knowledge.data ?? [], skills: skills.data ?? [], research: research.data ?? [], researchBudget: { provider: "tavily", monthStart: month, monthlyCredits, guardPercent, guardLimit, usedCredits: Number(tavily?.estimated_credits ?? 0), searchCount: Number(tavily?.search_count ?? 0), remainingCredits: Math.max(0, guardLimit - Number(tavily?.estimated_credits ?? 0)) } }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error("[admin/veille] GET failed", e);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Impossible de charger la veille." }, { status: 500, headers: { "Cache-Control": "no-store" } });
