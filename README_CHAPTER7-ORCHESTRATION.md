@@ -46,3 +46,20 @@ Cette première tranche de Chapter 7 ne remplace pas les mécanismes Chapter 5/6
 La table `lia_orchestration_steps` porte maintenant des métadonnées de graphe : dépendances, lane d'agent et politique d'exécution bornée. Une étape ne peut pas être exécutée tant que ses dépendances déclarées ne sont pas terminées.
 
 Les lanes actuelles sont descriptives et gouvernées : `lia:finance-observer`, `lia:research`, `lia:relationship`, `lia:human-gate` et `lia:orchestrator`. Elles ne donnent aucune permission supplémentaire.
+
+## Étape 3 — Replanning dynamique gouverné
+
+Le runtime ne s'arrête plus systématiquement sur un échec de vérification terminal.
+
+Lorsqu'une étape échoue après épuisement de son recovery, LIA peut reconstruire le graphe restant avec un budget strict de 2 replans maximum par mission. La procédure ayant échoué est exclue du nouveau plan afin d'éviter de répéter mécaniquement la même voie.
+
+Le replan conserve :
+- les étapes déjà terminées ;
+- la traçabilité de l'échec et de sa cause ;
+- la version du graphe (plan_version) ;
+- le compteur de replans (replan_count) ;
+- l'historique borné des replans ;
+- les dépendances et lanes d'agents gouvernées ;
+- les mêmes règles de Policy / Human Gate.
+
+Un replan ne crée aucune permission et n'autorise aucune écriture financière sensible.
