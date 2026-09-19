@@ -13,3 +13,6 @@ assert.ok(source.includes('replanLiaOrchestration'), 'runtime must support gover
 assert.ok(source.includes('replan_budget_exhausted'), 'replanning must have a hard budget');
 assert.ok(source.includes('excludeProcedureSlugs'), 'replanning must avoid the failed procedure');
 assert.ok(source.includes('plan_version'), 'replanning must version the task graph');
+assert.ok(source.includes('handoff_context'), 'runtime must persist structured agent handoffs');
+assert.ok(source.includes('evidence_refs'), 'runtime must persist bounded evidence references');
+assert.ok(source.includes('previous_step_output'), 'runtime must pass verified prior output into the next agent lane');
