@@ -161,7 +161,7 @@ export async function advanceLiaOrchestration(args: {
 }): Promise<OrchestrationRuntimeResult> {
   const { data: run, error: runError } = await args.supabase
     .from("lia_orchestration_runs")
-    .select("id,user_id,status,max_steps,current_step,objective,context,result,strategy_key")
+    .select("id,user_id,status,max_steps,current_step,objective,context,result,strategy_key,plan_version,replan_count,replan_reason,replanned_at")
     .eq("id", args.runId).eq("user_id", args.userId).single();
   if (runError || !run) throw new Error("Orchestration introuvable.");
   if (["completed", "failed", "blocked", "cancelled"].includes(run.status)) {
