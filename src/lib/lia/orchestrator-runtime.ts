@@ -48,7 +48,7 @@ export async function advanceLiaOrchestration(args: {
 
   const { data: step, error: stepError } = await args.supabase
     .from("lia_orchestration_steps")
-    .select("id,step_index,procedure_slug,status,risk_class,human_gate_required,objective,verification_rules,input_context,output_context,retry_count")
+    .select("id,step_index,procedure_slug,status,risk_class,human_gate_required,objective,verification_rules,input_context,output_context,retry_count,depends_on,agent_key,execution_policy")
     .eq("run_id", run.id).eq("step_index", Number(run.current_step) + 1).maybeSingle();
   if (stepError) throw new Error(stepError.message);
   if (!step) {
@@ -60,6 +60,20 @@ export async function advanceLiaOrchestration(args: {
   }
 
   const now = new Date().toISOString();
+  const dependencies = Array.isArray(step.depends_on) ? step.depends_on.map(Number).filter(Number.isFinite) : [];
+  if (dependencies.length) {
+    const { data: dependencyRows, error: dependencyError } = await args.supabase
+      .from("lia_orchestration_steps")
+      .select("step_index,status")
+      .eq("run_id", run.id)
+      .in("step_index", dependencies);
+    if (dependencyError) throw new Error(dependencyError.message);
+    const incomplete = dependencies.filter(index => !dependencyRows?.some(row => Number(row.step_index) === index && row.status === "completed"));
+    if (incomplete.length) {
+      await args.supabase.from("lia_orchestration_steps").update({ status: "planned", recovery_strategy: "wait_for_dependencies", recovery_reason: `Dépendances non terminées : ${incomplete.join(", ")}` }).eq("id", step.id);
+      return { runId: run.id, status: "running", step: { id: step.id, index: step.step_index, procedure: step.procedure_slug ?? "", status: "planned" }, output: { blocked_by_dependencies: incomplete, agent_key: step.agent_key ?? null }, nextStep: step.step_index };
+    }
+  }
   if (step.status === "blocked") {
     await args.supabase.from("lia_orchestration_runs").update({ status: "blocked", updated_at: now, result: { reason: "Étape bloquée par les limites de gouvernance.", step_id: step.id } }).eq("id", run.id);
     return { runId: run.id, status: "blocked", step: { id: step.id, index: step.step_index, procedure: step.procedure_slug ?? "", status: "blocked" }, output: { reason: "Étape bloquée." }, nextStep: null };
