@@ -210,6 +210,19 @@ export async function persistLiaOrchestrationPlan(args: {
   }).select("id,objective,status,max_steps,current_step,created_at").single();
   if (error || !run) throw new Error(error?.message ?? "Impossible de créer l'orchestration.");
 
+  const { error: budgetError } = await args.supabase.from("lia_orchestration_budgets").insert({
+    run_id: run.id,
+    user_id: args.userId,
+    max_steps: args.plan.maxSteps,
+    max_tool_calls: Math.max(2, args.plan.maxSteps + 2),
+    max_retries: 4,
+    max_replans: 2,
+    max_research_requests: 3,
+    max_memory_writes: 5,
+    max_runtime_ms: 30000,
+  });
+  if (budgetError) throw new Error(budgetError.message);
+
   if (args.plan.steps.length) {
     const { error: stepError } = await args.supabase.from("lia_orchestration_steps").insert(
       args.plan.steps.map(s => ({
