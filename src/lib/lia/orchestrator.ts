@@ -35,6 +35,14 @@ function riskRank(v: string) {
   return v === "critical" ? 3 : v === "write-sensitive" ? 2 : v === "recommendation" ? 1 : 0;
 }
 
+function agentKeyForProcedure(slug: string) {
+  if (slug === "research_and_verify") return "lia:research";
+  if (slug === "financial_snapshot_review" || slug === "budget_health_check") return "lia:finance-observer";
+  if (slug === "relational_adaptation") return "lia:relationship";
+  if (slug === "human_gate_sensitive_action") return "lia:human-gate";
+  return "lia:orchestrator";
+}
+
 function classifyObjective(objective: string) {
   const s = objective.toLowerCase();
   return {
@@ -212,6 +220,16 @@ export async function persistLiaOrchestrationPlan(args: {
         verification_rules: s.verificationRules,
         input_context: {},
         output_context: {},
+        parent_step_id: s.index > 1 ? null : null,
+        depends_on: s.index > 1 ? [s.index - 1] : [],
+        agent_key: agentKeyForProcedure(s.procedure.slug),
+        execution_policy: {
+          read_only: !s.humanGateRequired,
+          human_gate_required: s.humanGateRequired,
+          risk_class: s.riskClass,
+          max_retries: 2,
+          permission_grant: false,
+        },
       }))
     );
     if (stepError) throw new Error(stepError.message);
