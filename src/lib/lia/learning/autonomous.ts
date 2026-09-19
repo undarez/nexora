@@ -7,6 +7,7 @@ import { buildKnowledgeGraph } from "@/lib/lia/knowledge-graph";
 import { acceptLearningRecord } from "@/lib/lia/cognitive-core";
 import { buildMetacognitivePlan, recordMetacognitivePlan } from "@/lib/lia/learning/metacognition";
 import { evaluateLiaSkills } from "@/lib/lia/learning/skill-evaluator";
+import { runSkillImprovementLab } from "@/lib/lia/learning/skill-lab";
 
 export type LearningTopic = {
   id: string;
@@ -224,6 +225,11 @@ export async function runAutonomousLearningCycle(admin: SupabaseClient, userId: 
     const status = research.contradictions.length ? "blocked_contradiction" : verified.length ? "learned" : "candidate_knowledge";
     await admin.from("lia_metacognitive_cycles").update({ status: "evaluated", evaluation: { verified_claims: verified.length, contradictions: research.contradictions.length, sources_acquired: acquisitions, action: metacognitivePlan.action, confidence: verified.length ? 80 : 40 }, next_objective: metacognitivePlan.nextObjective, updated_at: new Date().toISOString() }).eq("id", metacognitiveCycleId).eq("user_id", userId);
     const skillEvaluation = await evaluateLiaSkills(admin, userId, cycle.id);
+    let improvementLab: Record<string, unknown> = { status: "skipped", reason: "no_skill_needs_review" };
+    if (skillEvaluation.needsReview > 0) {
+      const { data: flagged } = await admin.from("lia_skill_evaluations").select("skill_id,gaps").eq("learning_cycle_id", cycle.id).eq("verdict", "needs_review").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (flagged?.skill_id) improvementLab = await runSkillImprovementLab(admin, userId, String(flagged.skill_id), Array.isArray(flagged.gaps) ? flagged.gaps.map(String) : []);
+    }
     await updateCycle({
       status,
       finished_at: new Date().toISOString(),
@@ -235,9 +241,9 @@ export async function runAutonomousLearningCycle(admin: SupabaseClient, userId: 
       contradictions: research.contradictions.length,
       accepted_memories: acceptedMemoryIds.length,
       source_refs: sourceRefs,
-      guardrails: { trusted_domains_only: true, max_sources: 4, max_bytes: 450000, timeout_ms: 8000, activation_allowed: false, financial_writes_allowed: false },
+      guardrails: { skill_evaluation: skillEvaluation, improvement_lab: improvementLab, trusted_domains_only: true, max_sources: 4, max_bytes: 450000, timeout_ms: 8000, activation_allowed: false, financial_writes_allowed: false },
     });
-    return { status, cycleId: cycle.id, metacognitiveCycleId, topic: topic.id, provider: discovery.provider, sources: acquisitions, candidates, verified: verified.length, contradictions: research.contradictions.length, nextObjective: metacognitivePlan.nextObjective, skillEvaluation };
+    return { status, cycleId: cycle.id, metacognitiveCycleId, topic: topic.id, provider: discovery.provider, sources: acquisitions, candidates, verified: verified.length, contradictions: research.contradictions.length, nextObjective: metacognitivePlan.nextObjective, skillEvaluation, improvementLab };
   } catch (error) {
     await updateCycle({ status: "failed", finished_at: new Date().toISOString(), error: error instanceof Error ? error.message : "learning_cycle_failed" });
     throw error;
