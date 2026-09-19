@@ -43,6 +43,9 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ status: result.minimumEvidenceMet ? "research_verified" : "research_review", ...result }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
+    const message=e instanceof Error?e.message:"unknown";
+    if(message==="tavily_budget_guard") return jsonError(e,429,"tavily_budget_guard");
+    if(message==="tavily_budget_guard_unavailable") return jsonError(e,503,"tavily_budget_guard_unavailable");
     return jsonError(e, 502, "live_research_failed");
   }
 }
