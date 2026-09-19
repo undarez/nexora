@@ -40,3 +40,9 @@ Le runtime respecte désormais le `max_steps` persisté du plan et n'ajoute au t
 - `npm run lia:orchestration`
 
 Cette première tranche de Chapter 7 ne remplace pas les mécanismes Chapter 5/6 : elle les relie à l'exécution observable de l'orchestrateur.
+
+## Étape 2 — Task Graph gouverné
+
+La table `lia_orchestration_steps` porte maintenant des métadonnées de graphe : dépendances, lane d'agent et politique d'exécution bornée. Une étape ne peut pas être exécutée tant que ses dépendances déclarées ne sont pas terminées.
+
+Les lanes actuelles sont descriptives et gouvernées : `lia:finance-observer`, `lia:research`, `lia:relationship`, `lia:human-gate` et `lia:orchestrator`. Elles ne donnent aucune permission supplémentaire.
