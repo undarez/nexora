@@ -53,7 +53,7 @@ export async function executeAgentTool(
       if (!query) throw new Error("Une requête de recherche web est obligatoire.");
       const maxSources = Math.min(Math.max(Number(args.max_sources ?? 4), 1), 6);
       const timeoutMs = Math.min(Math.max(Number(args.timeout_ms ?? 8000), 2000), 12000);
-      const result = await runLiveResearch({ query, maxSources, timeoutMs, discover: args.discover !== false });
+      const result = await runLiveResearch({ query, maxSources, timeoutMs, discover: args.discover !== false, autonomous: args.autonomous === true });
       await admin.from("lia_research_runs").insert({ user_id: userId, query, evidence: result.evidence ?? [], claims: result.claims ?? [], contradictions: result.contradictions ?? [], stale_evidence: result.staleEvidence ?? [], unknowns: result.unknowns ?? [], minimum_evidence_met: Boolean(result.minimumEvidenceMet), knowledge_graph_ready: Boolean(result.minimumEvidenceMet), activation_allowed: false });
       return { ...result, query, live: true, read_only: true, activation_allowed: false };
     }
