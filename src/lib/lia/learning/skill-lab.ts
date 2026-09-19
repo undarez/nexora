@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { liaChat, type LiaProviderMessage } from "@/lib/lia/provider";
-import { buildReplayReport } from "@/lib/lia/replay-harness";
+import { buildReplayReport, type ReplayScenario } from "@/lib/lia/replay-harness";
 
 type Skill = { id:string; slug:string; name:string; description:string; category:string; status:string; trust_score:number|null; active_version_id:string|null };
 type Version = { id:string; version:number; content:string };
@@ -9,6 +9,19 @@ type Version = { id:string; version:number; content:string };
 const clamp = (n:number,min=0,max=100) => Math.max(min,Math.min(max,Math.round(Number.isFinite(n)?n:min)));
 const clean = (s:unknown,max:number) => typeof s === "string" ? s.trim().slice(0,max) : "";
 const fingerprint = (s:string) => createHash("sha256").update(s.slice(0,30000),"utf8").digest("hex");
+
+function challengeToScenario(challenge:{name:string;input:string;checks:string[]},index:number):ReplayScenario {
+  const text = [challenge.name, challenge.input, ...challenge.checks].join(" ").toLowerCase();
+  const expectedCaseIds:string[] = [];
+  const add = (id:string) => { if (!expectedCaseIds.includes(id)) expectedCaseIds.push(id); };
+  if (/(activation|activer automatiquement|auto.?activation|capacit)/.test(text)) add("safety-no-auto-activation");
+  if (/(policy|permission|autorisation|contourn|bypass|gouvernance)/.test(text)) add("safety-no-policy-bypass");
+  if (/(verification|vérification|etat reel|état réel|post.?condition|preuve|evidence|observ)/.test(text)) add("verification-real-state");
+  if (/(inconclusive|inconclus|insuffisant|absence de preuve|succès|success)/.test(text)) add("verification-no-inconclusive-success");
+  if (/(correction|procedure|procédure|remediation|réparation)/.test(text)) add("procedure-explicit-correction");
+  if (!expectedCaseIds.length) add("procedure-explicit-correction");
+  return { id:`challenge-${index+1}-${fingerprint(challenge.input).slice(0,8)}`, name:challenge.name, input:challenge.input, expectedCaseIds, mustRemainSafe:true };
+}
 
 function parseJson(raw:string):Record<string,unknown>|null {
   const body=raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1] ?? raw;
@@ -75,8 +88,9 @@ export async function runSkillImprovementLab(admin:SupabaseClient,userId:string,
       return {status:"blocked",labId:lab.id,reason:"candidate_generation_failed"};
     }
 
-    const replay=buildReplayReport({baselineContent:baseline.content,candidateContent:candidate.content});
-    const challengeFailures=challenges.filter(x=>!x.expectedFailure).length;
+    const challengeScenarios=challenges.map(challengeToScenario);
+    const replay=buildReplayReport({baselineContent:baseline.content,candidateContent:candidate.content,scenarios:challengeScenarios});
+    const challengeFailures=replay.candidate.runs.filter(run=>!run.passed).length;
     const slug=`${skillRow.slug}-candidate-${fingerprint(candidate.content).slice(0,10)}`;
     const {data:newSkillId,error:createError}=await admin.rpc("lia_create_skill_candidate",{p_user_id:userId,p_scope:"global",p_slug:slug,p_name:`${skillRow.name} — Candidate`,p_description:candidate.description,p_category:skillRow.category,p_source_type:"corrected",p_content:candidate.content,p_trigger_context:{chapter:6,baseline_skill_id:skillId,lab_id:lab.id},p_expected_result:candidate.expectedResult,p_verification_steps:candidate.verificationSteps,p_failure_modes:candidate.failureModes,p_source_refs:[{type:"baseline_skill",skill_id:skillId,version:baseline.version}],p_memory_gate:{useful:true,reliable:true,reproducible:true,generalizable:true,obsolete:false,evidence_required:true}});
     if(createError||!newSkillId)throw new Error(createError?.message||"candidate_skill_creation_failed");
@@ -94,7 +108,7 @@ export async function runSkillImprovementLab(admin:SupabaseClient,userId:string,
       status:"completed",candidate_skill_id:newSkillId,candidate_version_id:newVersion?.id??null,challenge_count:challenges.length,
       challenge_failures:challengeFailures,replay_score:replay.candidate.score,verdict:replay.comparison.verdict,
       regressions:replay.comparison.regressions,improvements:replay.comparison.improvedCases,
-      evidence:{eligible_for_review:eligible,baseline_fingerprint:replay.baselineFingerprint,candidate_fingerprint:replay.candidateFingerprint,challenge_fingerprints:challenges.map(x=>fingerprint(x.input)),activation_allowed:false},
+      evidence:{eligible_for_review:eligible,baseline_fingerprint:replay.baselineFingerprint,candidate_fingerprint:replay.candidateFingerprint,challenge_fingerprints:challenges.map(x=>fingerprint(x.input)),challenge_scenarios:challengeScenarios.map(({input:_input,...scenario})=>scenario),challenge_replay:replay.candidate.runs,activation_allowed:false},
       completed_at:new Date().toISOString()
     }).eq("id",lab.id);
     return {status:"completed",labId:lab.id,candidateSkillId:newSkillId,candidateVersionId:newVersion?.id??null,replay:replay.comparison,eligibleForHumanReview:eligible,activationAllowed:false};
