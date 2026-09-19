@@ -220,8 +220,12 @@ export default function OrchestrationPage() {
                 <div className="mt-3 space-y-2">
                   {(execution.trace ?? []).map((item: any, index: number) => (
                     <div key={`${item.step ?? "x"}-${index}`} className="rounded-xl border bg-background p-3 text-xs">
-                      <span className="font-semibold">Étape {item.step ?? "—"}</span> · {item.procedure ?? "—"} · <span className="font-medium">{item.status}</span>
-                    </div>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="font-semibold">Étape {item.step ?? "—"}</span> · {item.procedure ?? "—"} · <span className="font-medium">{item.status}</span>
+                      </div>
+                      {item.output && (
+                        <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/20 p-2 text-[11px] leading-5 text-muted-foreground">{JSON.stringify(item.output, null, 2)}</pre>
+                      )}
                   ))}
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">L'exécution est bornée : lecture/analyse autonome autorisée, écriture financière sensible toujours protégée par le Human Gate.</p>
