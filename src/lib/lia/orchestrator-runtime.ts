@@ -247,12 +247,6 @@ export async function advanceLiaOrchestration(args: {
   }
 
   await ensureAutonomyBudget({ supabase: args.supabase, userId: args.userId, run });
-  const stepBudget = await consumeAutonomyBudget({ supabase: args.supabase, userId: args.userId, runId: run.id, dimension: "steps" });
-  if (stepBudget.allowed !== true) {
-    await blockForBudget({ supabase: args.supabase, runId: run.id, dimension: "steps", budget: stepBudget });
-    return { runId: run.id, status: "blocked", step: { id: step.id, index: step.step_index, procedure: step.procedure_slug ?? "", status: "blocked" }, output: { autonomy_budget: stepBudget }, nextStep: null };
-  }
-
   const now = new Date().toISOString();
   const dependencies = Array.isArray(step.depends_on) ? step.depends_on.map(Number).filter(Number.isFinite) : [];
   if (dependencies.length) {
@@ -296,6 +290,12 @@ export async function advanceLiaOrchestration(args: {
     verified_source: Object.keys(previousStepOutput).length > 0,
     evidence: Array.isArray(previousStepOutput.evidence_refs) ? previousStepOutput.evidence_refs : [],
   };
+
+  const stepBudget = await consumeAutonomyBudget({ supabase: args.supabase, userId: args.userId, runId: run.id, dimension: "steps" });
+  if (stepBudget.allowed !== true) {
+    await blockForBudget({ supabase: args.supabase, runId: run.id, dimension: "steps", budget: stepBudget });
+    return { runId: run.id, status: "blocked", step: { id: step.id, index: step.step_index, procedure: step.procedure_slug ?? "", status: "blocked" }, output: { autonomy_budget: stepBudget }, nextStep: null };
+  }
 
   await args.supabase.from("lia_orchestration_runs").update({ status: "running", updated_at: now }).eq("id", run.id);
   await args.supabase.from("lia_orchestration_steps").update({
