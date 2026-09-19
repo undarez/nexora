@@ -63,3 +63,13 @@ Le replan conserve :
 - les mêmes règles de Policy / Human Gate.
 
 Un replan ne crée aucune permission et n'autorise aucune écriture financière sensible.
+## Étape 4 — Handoffs multi-agents structurés
+
+Chaque étape possède une lane d'agent gouvernée. Le runtime transmet désormais au step suivant un handoff structuré contenant l'agent source, l'agent cible, l'étape source, l'étape cible et les éléments d'évidence disponibles.
+
+Les sorties vérifiées produisent également des evidence_refs bornées. Elles servent de contexte de travail et de traçabilité ; elles ne donnent aucune permission supplémentaire.
+
+Le principe est :
+`agent A → sortie vérifiée → handoff/evidence → agent B → vérification`.
+
+Les lanes restent soumises aux mêmes Policy Gates, Human Gates et limites d'exécution.
