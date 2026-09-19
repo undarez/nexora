@@ -22,11 +22,16 @@ export async function GET() {
     const error = knowledge.error || skills.error || research.error || providerUsage.error;
     if (error) return NextResponse.json({ error: error.message }, { status: 503 });
     const usageRows = providerUsage.data ?? [];
-    const monthlyCredits = Number(process.env.TAVILY_MONTHLY_CREDITS || 1000);
-    const guardPercent = Number(process.env.TAVILY_USAGE_GUARD_PERCENT || 90);
-    const guardLimit = Math.max(1, Math.floor(monthlyCredits * Math.min(100, Math.max(1, guardPercent)) / 100));
-    const usedCredits = usageRows.reduce((sum: number, row: any) => sum + Number(row.credits ?? 0), 0);
-    return NextResponse.json({ knowledge: knowledge.data ?? [], skills: skills.data ?? [], research: research.data ?? [], researchBudget: { provider: "tavily", monthStart: month, monthlyCredits, guardPercent, guardLimit, usedCredits, searchCount: usageRows.length, remainingCredits: Math.max(0, guardLimit - usedCredits) } }, { headers: { "Cache-Control": "no-store" } });
+    const monthlyCredits = Math.max(1, Number(process.env.TAVILY_MONTHLY_CREDITS || 1000));
+    const autonomousPercent = 20;
+    const autonomousReserve = Math.max(1, Math.floor(monthlyCredits * autonomousPercent / 100));
+    const userQuota = Math.max(0, monthlyCredits - autonomousReserve);
+    const userRows = usageRows.filter((row: any) => (row.metadata?.budget_pool || "user") === "user");
+    const autonomousRows = usageRows.filter((row: any) => row.metadata?.budget_pool === "autonomous");
+    const userUsedCredits = userRows.reduce((sum: number, row: any) => sum + Number(row.credits ?? 0), 0);
+    const autonomousUsedCredits = autonomousRows.reduce((sum: number, row: any) => sum + Number(row.credits ?? 0), 0);
+    const usedCredits = userUsedCredits + autonomousUsedCredits;
+    return NextResponse.json({ knowledge: knowledge.data ?? [], skills: skills.data ?? [], research: research.data ?? [], researchBudget: { provider: "tavily", monthStart: month, monthlyCredits, autonomousPercent, autonomousReserve, userQuota, userUsedCredits, autonomousUsedCredits, usedCredits, searchCount: usageRows.length, userRemaining: Math.max(0, userQuota - userUsedCredits), autonomousRemaining: Math.max(0, autonomousReserve - autonomousUsedCredits), remainingCredits: Math.max(0, monthlyCredits - usedCredits) } }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error("[admin/veille] GET failed", e);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Impossible de charger la veille." }, { status: 500, headers: { "Cache-Control": "no-store" } });
