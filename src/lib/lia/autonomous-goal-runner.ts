@@ -10,6 +10,7 @@ import { verifyReadOnlyObservation, summarizeVerifiedObservation } from "@/lib/l
 import { runOppositionLearning } from "@/lib/lia/opposition-learning";
 import { loadLiaMemory, rememberLiaEpisode } from "@/lib/lia/memory-core";
 import { AGENT_TOOLS } from "@/lib/agent-runtime/tool-registry";
+import { buildLiaIntelligenceBridge } from "@/lib/lia/intelligence-bridge";
 
 const AUTONOMOUS_TOOLS = AGENT_TOOLS.filter(tool => tool.risk === "read").map(tool => tool.name);
 export type AutonomousRunResult = { loopRunId: string; status: "completed" | "blocked" | "needs_human" | "failed"; stepsExecuted: number; observations: Array<{ tool: string; ok: boolean }>; nextAction: string; progress: number };
@@ -32,6 +33,7 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
   if (lifecycle.state === "needs_human") return { loopRunId, status: "needs_human", stepsExecuted: 0, observations: [], nextAction: lifecycle.nextAction, progress: lifecycle.progress };
 
   const task = inferTask(run.context); const tools = safeToolSet();
+  const intelligenceBridge = buildLiaIntelligenceBridge(run.goal);
   const brain = await buildLiaBrainContext({ supabase, userId, query: run.goal, loopRunId }); const compactBrain = compactBrainContext(brain) as Record<string, unknown>;
   const durableMemory = await loadLiaMemory(supabase, userId, run.goal);
   const previousMemory = run.context?.reasoning_memory as Partial<ReasoningMemoryV2> | undefined;
@@ -48,10 +50,10 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
   for (let i = 0; i < bounded; i++) {
     const modelGuard = harness.guard("model", `model:${i}`); if (!modelGuard.allowed) break;
     const modelStarted = Date.now();
-    const decision = await chooseNextReasoningStepV2({ goal: run.goal, task, allowedTools: tools, memory, observations: detailed, remainingSteps: bounded - i, durableContext: { ...compactBrain, durable_memory: durableMemory.compact } });
+    const decision = await chooseNextReasoningStepV2({ goal: run.goal, task, allowedTools: tools, memory, observations: detailed, remainingSteps: bounded - i, durableContext: { ...compactBrain, durable_memory: durableMemory.compact, intelligence_bridge: intelligenceBridge } });
     harness.record({ kind: "model", name: "reasoning-engine-v2", ok: true, startedAt: new Date(modelStarted).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - modelStarted });
     memory.openQuestions = decision.questions; memory.checks = [...memory.checks, ...decision.checks].slice(-20);
-    await recordAgentLoopStep(supabase, loopRunId, 10 + i, { phase: "decide", agentKey: "lia:reasoning-engine-v2", input: { task, allowed_tools: tools, remaining_steps: bounded - i, memory, durable_context_loaded: true, durable_memory_count: durableMemory.recalled.length }, output: { action: decision.action, tool: decision.tool, objective: decision.objective, questions: decision.questions, checks: decision.checks, confidence: decision.confidence }, status: "completed" });
+    await recordAgentLoopStep(supabase, loopRunId, 10 + i, { phase: "decide", agentKey: "lia:reasoning-engine-v2", input: { task, allowed_tools: tools, remaining_steps: bounded - i, memory, durable_context_loaded: true, durable_memory_count: durableMemory.recalled.length, intelligence_bridge: intelligenceBridge }, output: { action: decision.action, tool: decision.tool, objective: decision.objective, questions: decision.questions, checks: decision.checks, confidence: decision.confidence }, status: "completed" });
     await persistWorkingState(supabase, loopRunId, memory, compactBrain, harness.summary(), { recalled: durableMemory.compact, count: durableMemory.recalled.length, loaded_at: durableMemory.loadedAt });
 
     if (decision.action === "needs_human") { current = advanceGoalLifecycle(current, "needs_human", decision.objective || "Une validation humaine est nécessaire.", { completedStep: "reasoning_human_gate" }); await persistGoalLifecycle(supabase, loopRunId, current); harness.complete("blocked", "validation_humaine"); return { loopRunId, status: "needs_human", stepsExecuted: observations.length, observations, nextAction: current.nextAction, progress: current.progress }; }
@@ -62,7 +64,7 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
     try {
       const args = tool === "research_web" ? { query: run.goal, max_sources: 4, timeout_ms: 8000, discover: true } : {};
       const result = await executeAgentTool(supabase, userId, { name: tool, arguments: args }, { runId: loopRunId, stepId });
-      const verification = verifyReadOnlyObservation(result, detailed); const summary = summarizeVerifiedObservation(result); const ok = verification.passed;
+      const verification = verifyReadOnlyObservation(result, detailed); const summary = summarizeVerifiedObservation(result); const ok = verification.passed && verification.outcome === "verified";
       observations.push({ tool, ok }); detailed.push({ tool, ok, summary }); harness.record({ kind: "tool", name: tool, ok, startedAt: new Date(started).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - started, fingerprint: `tool:${tool}` });
       memory.completedTools.push(tool); memory.facts.push(`${tool}: ${summary.slice(0, 900)}`); memory.verifiedObservations += ok ? 1 : 0; memory.checks.push(...verification.checks.map(c => `${c.key}: ${c.observed ? "ok" : "failed"}`)); if (!ok) memory.replans += 1;
       await recordEvidence(supabase, loopRunId, `tool:${tool}`, "autonomous_observation", { result: typeof result === "object" ? result : { value: result }, verification }, stepId);
