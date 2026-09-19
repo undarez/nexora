@@ -227,6 +227,7 @@ export default function OrchestrationPage() {
                       {item.output && (
                         <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/20 p-2 text-[11px] leading-5 text-muted-foreground">{JSON.stringify(item.output, null, 2)}</pre>
                       )}
+                    </div>
                   ))}
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">L'exécution est bornée : lecture/analyse autonome autorisée, écriture financière sensible toujours protégée par le Human Gate.</p>
