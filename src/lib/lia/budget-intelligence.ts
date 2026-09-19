@@ -64,6 +64,62 @@ export function routeBudgetIntelligenceLayers(question: string): BudgetIntellige
   return Array.from(new Set<BudgetIntelligenceLayer>(["household_observation", ...selected, "governance"]));;
 }
 
+export type BudgetIntelligenceKnowledge = {
+  title: string;
+  statement: string;
+  confidence: number;
+  authority: string;
+  sourceName?: string | null;
+};
+
+export type BudgetIntelligenceObservation = {
+  label: string;
+  cadence?: string | null;
+  typicalAmount?: number | null;
+  occurrences?: number | null;
+  confidence?: number | null;
+};
+
+export type BudgetIntelligenceContext = {
+  version: "1.0";
+  layers: BudgetIntelligenceLayer[];
+  invariants: typeof BUDGET_INTELLIGENCE_INVARIANTS;
+  validatedKnowledge: Array<Pick<BudgetIntelligenceKnowledge, "title" | "statement" | "confidence" | "authority">>;
+  observedHabits: Array<Pick<BudgetIntelligenceObservation, "label" | "cadence" | "typicalAmount" | "occurrences" | "confidence">>;
+  interpretationRules: string[];
+};
+
+export function buildBudgetIntelligenceContext(
+  question: string,
+  knowledge: BudgetIntelligenceKnowledge[] = [],
+  habits: BudgetIntelligenceObservation[] = [],
+): BudgetIntelligenceContext {
+  const layers = routeBudgetIntelligenceLayers(question);
+  const validatedKnowledge = knowledge
+    .filter(item => Number.isFinite(item.confidence) && item.confidence >= 0.65)
+    .slice(0, 8)
+    .map(item => ({ title: item.title, statement: item.statement, confidence: item.confidence, authority: item.authority }));
+  const observedHabits = habits
+    .filter(item => item.confidence == null || item.confidence >= 0.75)
+    .slice(0, 8)
+    .map(item => ({ label: item.label, cadence: item.cadence ?? null, typicalAmount: item.typicalAmount ?? null, occurrences: item.occurrences ?? null, confidence: item.confidence ?? null }));
+  return {
+    version: "1.0",
+    layers,
+    invariants: BUDGET_INTELLIGENCE_INVARIANTS,
+    validatedKnowledge,
+    observedHabits,
+    interpretationRules: [
+      "Les flux observés du foyer priment sur les agrégats publics pour le diagnostic budgétaire.",
+      "Un engagement futur est séparé du flux déjà réalisé.",
+      "Une habitude observée n'est pas une obligation contractuelle.",
+      "Une prévision doit exposer ses hypothèses et rester distincte du réalisé.",
+      "Un scénario doit rester conditionnel et ne doit jamais modifier silencieusement le budget.",
+      "Une information publique sensible au temps doit être revalidée avant d'être utilisée comme fait actuel.",
+    ],
+  };
+}
+
 export function buildBudgetIntelligencePrompt(question: string, knowledge: Array<{ title: string; statement: string; confidence: number; authority: string; sourceName?: string | null }>): string {
   const layers = routeBudgetIntelligenceLayers(question);
   const relevant = knowledge
