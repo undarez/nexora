@@ -6,6 +6,7 @@ import { evaluateLiaGoal, persistLiaGoalEvaluation } from "@/lib/lia/goal-comple
 import { persistStrategyExperience, strategyScoreForOutcome } from "@/lib/lia/strategy-learning";
 import { executeAgentTool } from "@/lib/agent-runtime/executor";
 import { runLiveResearch } from "@/lib/lia/research/live";
+import { agentKeyForProcedure, buildLiaOrchestrationPlan } from "@/lib/lia/orchestrator";
 
 export type OrchestrationRuntimeResult = {
   runId: string;
@@ -28,6 +29,127 @@ async function recordStrategy(args: { supabase: SupabaseClient; userId: string; 
     strategyKey, outcome: scored.outcome, score: scored.score, context: args.context ?? {},
     evidence: [{ orchestration_run_id: args.run.id, outcome: args.outcome }]
   });
+}
+
+
+async function replanLiaOrchestration(args: {
+  supabase: SupabaseClient;
+  userId: string;
+  run: any;
+  failedProcedure: string;
+  reason: string;
+}) {
+  const replanCount = Number(args.run.replan_count ?? 0);
+  const maxReplans = 2;
+  if (replanCount >= maxReplans) return { replanned: false, reason: "replan_budget_exhausted" };
+
+  const currentStep = Number(args.run.current_step ?? 0);
+  const remaining = Math.max(1, Number(args.run.max_steps ?? 1) - currentStep);
+  const plan = await buildLiaOrchestrationPlan({
+    supabase: args.supabase,
+    userId: args.userId,
+    objective: String(args.run.objective ?? ""),
+    maxSteps: remaining,
+    excludeProcedureSlugs: [args.failedProcedure],
+  });
+  if (!plan.steps.length) return { replanned: false, reason: "no_safe_alternative_plan" };
+
+  const firstIndex = currentStep + 1;
+  const { data: existingSteps, error: existingError } = await args.supabase
+    .from("lia_orchestration_steps")
+    .select("id,step_index,status")
+    .eq("run_id", args.run.id)
+    .gte("step_index", firstIndex)
+    .order("step_index", { ascending: true });
+  if (existingError) throw new Error(existingError.message);
+
+  const reusable = (existingSteps ?? []).filter((row: any) => !["completed", "skipped"].includes(String(row.status)));
+  const applied: number[] = [];
+
+  for (let i = 0; i < plan.steps.length; i++) {
+    const planned = plan.steps[i];
+    const index = firstIndex + i;
+    const existing = reusable[i];
+    const payload = {
+      step_index: index,
+      procedure_id: planned.procedure.id,
+      procedure_slug: planned.procedure.slug,
+      objective: planned.objective,
+      status: planned.status,
+      risk_class: planned.riskClass,
+      human_gate_required: planned.humanGateRequired,
+      verification_rules: planned.verificationRules,
+      input_context: { replanned: true, replaced_procedure: args.failedProcedure, replan_reason: args.reason },
+      output_context: {},
+      parent_step_id: null,
+      depends_on: index > 1 ? [index - 1] : [],
+      agent_key: agentKeyForProcedure(planned.procedure.slug),
+      execution_policy: {
+        read_only: !planned.humanGateRequired,
+        human_gate_required: planned.humanGateRequired,
+        risk_class: planned.riskClass,
+        max_retries: 2,
+        permission_grant: false,
+      },
+      retry_count: 0,
+      last_error: null,
+      verified_at: null,
+      completed_at: null,
+      recovery_strategy: null,
+      recovery_reason: "Replan gouverné : " + args.reason,
+    };
+    if (existing) {
+      const { error } = await args.supabase.from("lia_orchestration_steps").update(payload).eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await args.supabase.from("lia_orchestration_steps").insert({ run_id: args.run.id, ...payload });
+      if (error) throw new Error(error.message);
+    }
+    applied.push(index);
+  }
+
+  const keepUntil = firstIndex + plan.steps.length - 1;
+  const obsoleteIds = reusable.filter((row: any) => Number(row.step_index) > keepUntil).map((row: any) => row.id);
+  if (obsoleteIds.length) {
+    const { error } = await args.supabase.from("lia_orchestration_steps").delete().in("id", obsoleteIds);
+    if (error) throw new Error(error.message);
+  }
+
+  const nextReplanCount = replanCount + 1;
+  const previousResult = cleanContext(args.run.result);
+  const history = Array.isArray(previousResult.replan_history) ? previousResult.replan_history : [];
+  const replanRecord = {
+    at: new Date().toISOString(),
+    from_step: firstIndex,
+    failed_procedure: args.failedProcedure,
+    reason: args.reason,
+    replacement_steps: plan.steps.map(step => ({ index: firstIndex + step.index - 1, procedure: step.procedure.slug })),
+    strategy_key: plan.strategyKey,
+  };
+  const nextStatus = plan.status === "blocked" ? "blocked" : plan.status === "awaiting_human" ? "awaiting_human" : "running";
+  const { error: runError } = await args.supabase
+    .from("lia_orchestration_runs")
+    .update({
+      status: nextStatus,
+      plan_version: Number(args.run.plan_version ?? 1) + 1,
+      replan_count: nextReplanCount,
+      replan_reason: args.reason,
+      replanned_at: new Date().toISOString(),
+      strategy_key: plan.strategyKey,
+      result: { ...previousResult, replan_history: [...history, replanRecord].slice(-5), replan: replanRecord, reason: "Task graph replanned after verification failure." },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", args.run.id);
+  if (runError) throw new Error(runError.message);
+
+  return {
+    replanned: true,
+    nextStatus,
+    planVersion: Number(args.run.plan_version ?? 1) + 1,
+    replanCount: nextReplanCount,
+    appliedSteps: applied,
+    strategyKey: plan.strategyKey,
+  };
 }
 
 /** Advances exactly one bounded orchestration step. It never executes an external write directly. */
@@ -127,6 +249,35 @@ export async function advanceLiaOrchestration(args: {
       const terminal = !recovery.retryAllowed || recovery.strategy === "stop";
       const nextProcedure = recovery.nextProcedure && recovery.nextProcedure !== slug ? recovery.nextProcedure : slug;
       const recoveryOutput = { ...output, verification, recovery };
+
+      if (terminal) {
+        const replan = await replanLiaOrchestration({
+          supabase: args.supabase,
+          userId: args.userId,
+          run,
+          failedProcedure: slug,
+          reason: "Vérification échouée à l'étape " + step.step_index + " : " + recovery.reason,
+        });
+        if (replan.replanned) {
+          const refreshed = await args.supabase
+            .from("lia_orchestration_steps")
+            .select("id,step_index,procedure_slug,status")
+            .eq("run_id", run.id)
+            .eq("step_index", step.step_index)
+            .maybeSingle();
+          const replannedStep = refreshed.data;
+          return {
+            runId: run.id,
+            status: replan.nextStatus,
+            step: replannedStep
+              ? { id: replannedStep.id, index: replannedStep.step_index, procedure: replannedStep.procedure_slug ?? "", status: replannedStep.status }
+              : { id: step.id, index: step.step_index, procedure: nextProcedure, status: "planned" },
+            output: { ...recoveryOutput, replan },
+            nextStep: replan.nextStatus === "running" ? step.step_index : null,
+          };
+        }
+      }
+
       await args.supabase.from("lia_orchestration_steps").update({
         status: terminal ? "failed" : "planned",
         procedure_slug: terminal ? slug : nextProcedure,
