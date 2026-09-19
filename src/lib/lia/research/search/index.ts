@@ -16,7 +16,6 @@ class TavilyProvider implements SearchProvider {
  constructor(private readonly budgetPool:"user"|"autonomous"="user") {}
  async search(query:string,limit:number){const key=process.env.TAVILY_API_KEY;if(!key)throw new Error("search_provider_not_configured");
   const monthlyLimit=Number(process.env.TAVILY_MONTHLY_CREDITS||1000);
-  const guardPercent=Number(process.env.TAVILY_USAGE_GUARD_PERCENT||90);
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secret=process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!url||!secret)throw new Error("tavily_budget_guard_unavailable");
