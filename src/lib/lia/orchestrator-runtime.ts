@@ -41,6 +41,8 @@ async function replanLiaOrchestration(args: {
 }) {
   const replanCount = Number(args.run.replan_count ?? 0);
   const maxReplans = 2;
+  const replanBudget = await consumeAutonomyBudget({ supabase: args.supabase, userId: args.userId, runId: args.run.id, dimension: "replans" });
+  if (replanBudget.allowed !== true) return { replanned: false, reason: "replan_budget_exhausted", budget: replanBudget };
   if (replanCount >= maxReplans) return { replanned: false, reason: "replan_budget_exhausted" };
 
   const currentStep = Number(args.run.current_step ?? 0);
@@ -153,6 +155,58 @@ async function replanLiaOrchestration(args: {
 }
 
 
+async function consumeAutonomyBudget(args: {
+  supabase: SupabaseClient;
+  userId: string;
+  runId: string;
+  dimension: string;
+  amount?: number;
+}) {
+  let result = await args.supabase.rpc("lia_consume_orchestration_budget", {
+    p_run_id: args.runId,
+    p_user_id: args.userId,
+    p_dimension: args.dimension,
+    p_amount: args.amount ?? 1,
+  });
+  if (result.error) throw new Error(result.error.message);
+  return cleanContext(result.data);
+}
+
+async function ensureAutonomyBudget(args: {
+  supabase: SupabaseClient;
+  userId: string;
+  run: any;
+}) {
+  const { data } = await args.supabase.from("lia_orchestration_budgets").select("run_id").eq("run_id", args.run.id).maybeSingle();
+  if (data) return;
+  const maxSteps = Math.max(1, Number(args.run.max_steps ?? 5));
+  const { error } = await args.supabase.from("lia_orchestration_budgets").insert({
+    run_id: args.run.id,
+    user_id: args.userId,
+    max_steps: maxSteps,
+    max_tool_calls: Math.max(2, maxSteps + 2),
+    max_retries: 4,
+    max_replans: 2,
+    max_research_requests: 3,
+    max_memory_writes: 5,
+    max_runtime_ms: 30000,
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function blockForBudget(args: {
+  supabase: SupabaseClient;
+  runId: string;
+  dimension: string;
+  budget: Record<string, unknown>;
+}) {
+  await args.supabase.from("lia_orchestration_runs").update({
+    status: "blocked",
+    updated_at: new Date().toISOString(),
+    result: { reason: "Autonomy budget exhausted.", budget_dimension: args.dimension, budget: args.budget },
+  }).eq("id", args.runId);
+}
+
 function buildStepEvidence(procedure: string, output: Record<string, unknown>, verified: boolean) {
   const keys = Object.keys(output).filter(key => key !== "verification").slice(0, 12);
   return [{
@@ -190,6 +244,13 @@ export async function advanceLiaOrchestration(args: {
   }
   if (["completed", "skipped"].includes(step.status)) {
     return { runId: run.id, status: run.status, step: { id: step.id, index: step.step_index, procedure: step.procedure_slug ?? "", status: step.status }, output: cleanContext(step.output_context), nextStep: step.step_index + 1 <= run.max_steps ? step.step_index + 1 : null };
+  }
+
+  await ensureAutonomyBudget({ supabase: args.supabase, userId: args.userId, run });
+  const stepBudget = await consumeAutonomyBudget({ supabase: args.supabase, userId: args.userId, runId: run.id, dimension: "steps" });
+  if (stepBudget.allowed !== true) {
+    await blockForBudget({ supabase: args.supabase, runId: run.id, dimension: "steps", budget: stepBudget });
+    return { runId: run.id, status: "blocked", step: { id: step.id, index: step.step_index, procedure: step.procedure_slug ?? "", status: "blocked" }, output: { autonomy_budget: stepBudget }, nextStep: null };
   }
 
   const now = new Date().toISOString();
@@ -244,6 +305,18 @@ export async function advanceLiaOrchestration(args: {
   }).eq("id", step.id);
 
   const slug = step.procedure_slug ?? "";
+  const toolBudget = await consumeAutonomyBudget({ supabase: args.supabase, userId: args.userId, runId: run.id, dimension: "tool_calls" });
+  if (toolBudget.allowed !== true) {
+    await blockForBudget({ supabase: args.supabase, runId: run.id, dimension: "tool_calls", budget: toolBudget });
+    return { runId: run.id, status: "blocked", step: { id: step.id, index: step.step_index, procedure: slug, status: "blocked" }, output: { autonomy_budget: toolBudget }, nextStep: null };
+  }
+  if (slug === "research_and_verify") {
+    const researchBudget = await consumeAutonomyBudget({ supabase: args.supabase, userId: args.userId, runId: run.id, dimension: "research_requests" });
+    if (researchBudget.allowed !== true) {
+      await blockForBudget({ supabase: args.supabase, runId: run.id, dimension: "research_requests", budget: researchBudget });
+      return { runId: run.id, status: "blocked", step: { id: step.id, index: step.step_index, procedure: slug, status: "blocked" }, output: { autonomy_budget: researchBudget }, nextStep: null };
+    }
+  }
   let output: Record<string, unknown> = {};
   let nextStatus: "completed" | "awaiting_human" | "failed" = "completed";
 
@@ -284,6 +357,11 @@ export async function advanceLiaOrchestration(args: {
     const verification = verifyLiaStepOutput(output, step.verification_rules);
     if (!verification.verified) {
       const retries = Number(step.retry_count ?? 0) + 1;
+      const retryBudget = await consumeAutonomyBudget({ supabase: args.supabase, userId: args.userId, runId: run.id, dimension: "retries" });
+      if (retryBudget.allowed !== true) {
+        await blockForBudget({ supabase: args.supabase, runId: run.id, dimension: "retries", budget: retryBudget });
+        return { runId: run.id, status: "blocked", step: { id: step.id, index: step.step_index, procedure: slug, status: "blocked" }, output: { autonomy_budget: retryBudget }, nextStep: null };
+      }
       const recovery = decideLiaRecovery({ procedure: slug, retryCount: retries, error: "verification_failed", verification });
       const terminal = !recovery.retryAllowed || recovery.strategy === "stop";
       const nextProcedure = recovery.nextProcedure && recovery.nextProcedure !== slug ? recovery.nextProcedure : slug;
