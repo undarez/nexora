@@ -73,3 +73,18 @@ Le principe est :
 `agent A → sortie vérifiée → handoff/evidence → agent B → vérification`.
 
 Les lanes restent soumises aux mêmes Policy Gates, Human Gates et limites d'exécution.
+## Étape 5 — Budget d'autonomie multidimensionnel
+
+Chaque mission d'orchestration possède maintenant un budget séparé pour plusieurs ressources :
+- étapes exécutables ;
+- appels outils ;
+- retries ;
+- replans ;
+- recherches externes ;
+- écritures mémoire.
+
+Les compteurs sont atomiques côté Supabase et indépendants du niveau d'autonomie utilisateur. L'épuisement d'une dimension bloque la mission au lieu de laisser le runtime continuer.
+
+Valeurs par défaut de mission : 5 étapes, 8 appels outils, 4 retries, 2 replans, 3 recherches externes et 5 écritures mémoire.
+
+Ce budget ne donne aucune permission. Il constitue une limite de consommation supplémentaire au-dessus de Policy, Permission et Human Gate.
