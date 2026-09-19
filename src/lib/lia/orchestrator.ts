@@ -35,7 +35,7 @@ function riskRank(v: string) {
   return v === "critical" ? 3 : v === "write-sensitive" ? 2 : v === "recommendation" ? 1 : 0;
 }
 
-function agentKeyForProcedure(slug: string) {
+export function agentKeyForProcedure(slug: string) {
   if (slug === "research_and_verify") return "lia:research";
   if (slug === "financial_snapshot_review" || slug === "budget_health_check") return "lia:finance-observer";
   if (slug === "relational_adaptation") return "lia:relationship";
@@ -60,9 +60,11 @@ export async function buildLiaOrchestrationPlan(args: {
   objective: string;
   maxSteps?: number;
   consentedPersonalization?: boolean;
+  excludeProcedureSlugs?: string[];
 }) : Promise<LiaOrchestrationPlan> {
   const maxSteps = Math.max(1, Math.min(5, Math.floor(args.maxSteps ?? 5)));
   const objective = args.objective.trim().slice(0, 2000);
+  const excludedProcedures = new Set((args.excludeProcedureSlugs ?? []).filter(Boolean));
   const c = classifyObjective(objective);
   const useCases = await searchLiaUseCases(args.supabase, args.userId, objective, undefined, 8);
   const useCase = useCases[0] ?? null;
@@ -138,6 +140,7 @@ export async function buildLiaOrchestrationPlan(args: {
   const selectedStrategy = strategies.find(s=>s.key===strategyKey) ?? strategies[0];
   const ordered: LiaProcedure[] = [];
   const add = (slug: string) => {
+    if (excludedProcedures.has(slug)) return;
     const p = candidates.find(x => x.p.slug === slug)?.p;
     if (p && !ordered.some(x => x.slug === p.slug)) ordered.push(p);
   };
@@ -153,6 +156,7 @@ export async function buildLiaOrchestrationPlan(args: {
     add("financial_snapshot_review");
     add("budget_health_check");
     if (!ordered.length) add("research_and_verify");
+    if (!ordered.length) add("relational_adaptation");
   }
   const steps = ordered.slice(0, maxSteps).map((p, i) => {
     const sel = candidates.find(x => x.p.id === p.id)!.sel;
