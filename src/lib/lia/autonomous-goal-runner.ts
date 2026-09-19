@@ -62,7 +62,7 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
     current = advanceGoalLifecycle(current, tool === "research_web" ? "researching" : "executing", decision.objective, { completedStep: `reasoning_select:${tool}` }); await persistGoalLifecycle(supabase, loopRunId, current);
     const started = Date.now(); const stepId = await recordAgentLoopStep(supabase, loopRunId, 30 + i, { phase: tool === "research_web" ? "observe" : "act", agentKey: "lia:autonomous-runner", input: { tool, risk: "read", autonomous: true, objective: decision.objective }, output: { pending: true }, status: "completed" });
     try {
-      const args = tool === "research_web" ? { query: run.goal, max_sources: 4, timeout_ms: 8000, discover: true } : {};
+      const args = tool === "research_web" ? { query: run.goal, max_sources: 4, timeout_ms: 8000, discover: true, autonomous: true } : {};
       const result = await executeAgentTool(supabase, userId, { name: tool, arguments: args }, { runId: loopRunId, stepId });
       const verification = verifyReadOnlyObservation(result, detailed); const summary = summarizeVerifiedObservation(result); const ok = verification.passed;
       observations.push({ tool, ok }); detailed.push({ tool, ok, summary }); harness.record({ kind: "tool", name: tool, ok, startedAt: new Date(started).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - started, fingerprint: `tool:${tool}` });
