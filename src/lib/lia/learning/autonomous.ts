@@ -95,7 +95,7 @@ export async function runAutonomousLearningCycle(admin: SupabaseClient, userId: 
   };
 
   try {
-    const discovery = await discoverTrustedSources(topic.query, 5);
+    const discovery = await discoverTrustedSources(topic.query, 5, [], "autonomous");
     if (!discovery.results.length) {
       await updateCycle({ status: "waiting_for_search_provider", finished_at: new Date().toISOString(), provider: discovery.provider, sources_found: 0 });
       return { status: "waiting_for_search_provider", cycleId: cycle.id, metacognitiveCycleId, topic: topic.id, provider: discovery.provider, sources: 0, nextObjective: metacognitivePlan.nextObjective };
