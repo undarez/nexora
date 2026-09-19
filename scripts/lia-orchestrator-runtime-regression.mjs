@@ -16,3 +16,8 @@ assert.ok(source.includes('plan_version'), 'replanning must version the task gra
 assert.ok(source.includes('handoff_context'), 'runtime must persist structured agent handoffs');
 assert.ok(source.includes('evidence_refs'), 'runtime must persist bounded evidence references');
 assert.ok(source.includes('previous_step_output'), 'runtime must pass verified prior output into the next agent lane');
+assert.ok(source.includes('lia_consume_orchestration_budget'), 'runtime must enforce the multidimensional autonomy budget');
+assert.ok(source.includes('dimension: "steps"'), 'runtime must budget executable steps');
+assert.ok(source.includes('dimension: "tool_calls"'), 'runtime must budget tool calls');
+assert.ok(source.includes('dimension: "research_requests"'), 'runtime must budget research requests');
+assert.ok(source.includes('dimension: "retries"'), 'runtime must budget retries');
