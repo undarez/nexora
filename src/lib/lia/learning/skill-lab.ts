@@ -82,6 +82,10 @@ export async function runSkillImprovementLab(admin:SupabaseClient,userId:string,
 
   try{
     const challenges=await challengeSkill(skillRow,baseline,gaps);
+    if (!challenges.length) {
+      await admin.from("lia_skill_lab_runs").update({status:"blocked",challenge_count:0,challenge_failures:0,completed_at:new Date().toISOString(),evidence:{reason:"no_challenges_generated",activation_allowed:false}}).eq("id",lab.id);
+      return {status:"blocked",labId:lab.id,reason:"no_challenges_generated"};
+    }
     const candidate=await proposeVersion(skillRow,baseline,gaps,challenges.map(x=>x.input));
     if(!candidate){
       await admin.from("lia_skill_lab_runs").update({status:"blocked",challenge_count:challenges.length,challenge_failures:challenges.length,completed_at:new Date().toISOString(),evidence:{reason:"candidate_generation_failed",challenge_fingerprints:challenges.map(x=>fingerprint(x.input)),activation_allowed:false}}).eq("id",lab.id);
