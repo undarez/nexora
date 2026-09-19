@@ -307,7 +307,7 @@ export async function advanceLiaOrchestration(args: {
           const replannedStep = refreshed.data;
           return {
             runId: run.id,
-            status: replan.nextStatus,
+            status: replan.nextStatus ?? "failed",
             step: replannedStep
               ? { id: replannedStep.id, index: replannedStep.step_index, procedure: replannedStep.procedure_slug ?? "", status: replannedStep.status }
               : { id: step.id, index: step.step_index, procedure: nextProcedure, status: "planned" },
