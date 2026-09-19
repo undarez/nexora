@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 const source = await (await import('node:fs/promises')).readFile('src/lib/lia/orchestrator-runtime.ts','utf8');
 for (const token of ['advanceLiaOrchestration','human_gate_sensitive_action','financial_snapshot_review','research_and_verify','relational_adaptation','createHumanGatedProposal']) assert.ok(source.includes(token), `missing ${token}`);
-assert.ok(source.includes('exactly one') || source.includes('exactly one') === false); // contract marker
+assert.ok(source.includes('persistedRun'), 'runtime must respect persisted plan budget');
+assert.ok(source.includes('persistedMaxSteps'), 'runtime must cap execution from persisted plan');
+assert.ok(source.includes('if (result.step)'), 'runtime must not emit phantom trace entries');
+assert.ok(source.includes('status: result.step.status'), 'trace must expose actual step status');
 console.log('✓ orchestrator runtime contract');
