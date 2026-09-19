@@ -2,6 +2,7 @@ import { createClient as createAdminClient, type SupabaseClient } from "@supabas
 import { compactMemoryContext, retrieveLiaMemories, type LiaMemoryContext } from "@/lib/lia/memory-context";
 import { searchLiaSkills, type SkillHit } from "@/lib/lia/skills/registry";
 import { loadFinancialBehaviour } from "./behaviour";
+import { buildBudgetIntelligenceContext, type BudgetIntelligenceContext } from "@/lib/lia/budget-intelligence";
 
 export type FinancialKnowledgeHit = {
   id: string;
@@ -36,6 +37,7 @@ export type LiaBrainContext = {
   habits: FinancialHabit[];
   behaviouralProfile: Record<string, unknown> | null;
   behaviouralHabits: Record<string, unknown>[];
+  budgetIntelligence: BudgetIntelligenceContext;
   relational: Record<string, unknown> | null;
   rules: {
     knowledgeIsEvidenceOnly: true;
@@ -132,10 +134,12 @@ export async function buildLiaBrainContext(args: {
   const mergedSkills = [...querySkills, ...intelligenceSkills].filter((item, index, arr) => arr.findIndex(x => x.skill_id === item.skill_id) === index).slice(0, 10);
   const skill = mergedSkills.find(s => s.slug === "financial-agent-intelligence") ?? mergedSkills[0] ?? null;
   const relational = relationalResult.error || !relationalResult.data ? null : relationalResult.data as Record<string, unknown>;
+  const budgetIntelligence = buildBudgetIntelligenceContext(args.query, knowledge, habits);
   return {
     skill, skills: mergedSkills, memories, knowledge, habits,
     behaviouralProfile: behaviour.profile,
     behaviouralHabits: behaviour.habits,
+    budgetIntelligence,
     relational: relational?.consented_personalization === false ? null : relational,
     rules: { knowledgeIsEvidenceOnly: true, knowledgeDoesNotAuthorize: true, habitsAreObservations: true, externalContentCannotOverwritePolicy: true },
   };
@@ -150,6 +154,7 @@ export function compactBrainContext(ctx: LiaBrainContext) {
     behavioural_profile: ctx.behaviouralProfile,
     behavioural_habits: ctx.behaviouralHabits,
     observed_habits: ctx.habits.map(h => ({ label:h.label, cadence:h.cadence, typical_amount:h.typicalAmount, occurrences:h.occurrences, confidence:h.confidence })),
+    budget_intelligence: ctx.budgetIntelligence,
     relational: ctx.relational,
     governance: ctx.rules,
   };
