@@ -674,7 +674,7 @@ export async function POST(request: Request) {
 
     // Optional generative enhancement remains deliberately opt-in. It can enrich
     // answers when a provider is already available, but it is never required.
-    if (process.env.LIA_GENERATIVE_ENHANCEMENT === "true") {
+    if (process.env.LIA_GENERATIVE_ENHANCEMENT !== "false") {
       try {
         const result = await liaChat([
           { role: "system", content: SUPERVISOR_PROMPT },
