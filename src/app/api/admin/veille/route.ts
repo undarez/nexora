@@ -17,7 +17,7 @@ export async function GET() {
       admin.from("financial_knowledge_items").select("id,knowledge_key,title,statement,authority,confidence,status,tags,created_at,updated_at").order("updated_at", { ascending: false }).limit(80),
       admin.from("lia_skills").select("id,name,slug,description,category,status,source_type,trust_score,use_count,success_count,failure_count,updated_at").order("updated_at", { ascending: false }).limit(80),
       admin.from("lia_research_runs").select("id,query,minimum_evidence_met,knowledge_graph_ready,created_at").order("created_at", { ascending: false }).limit(30),
-      admin.from("lia_research_provider_usage").select("provider,operation,credits,created_at").eq("provider","tavily").gte("created_at", monthStart.toISOString()).order("created_at", { ascending: false }).limit(1000),
+      admin.from("lia_research_provider_usage").select("provider,operation,credits,metadata,created_at").eq("provider","tavily").gte("created_at", monthStart.toISOString()).order("created_at", { ascending: false }).limit(1000),
     ]);
     const error = knowledge.error || skills.error || research.error || providerUsage.error;
     if (error) return NextResponse.json({ error: error.message }, { status: 503 });
