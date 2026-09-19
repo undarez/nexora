@@ -8,5 +8,5 @@ const files=[
 const missing=files.filter(f=>!fs.existsSync(f));
 if(missing.length) throw new Error("Missing Chapter 6 files: "+missing.join(", "));
 const lab=fs.readFileSync(files[1],"utf8");
-for(const marker of ["challengeSkill","proposeVersion","buildReplayReport","activationAllowed:false","lia_create_skill_candidate"]) if(!lab.includes(marker)) throw new Error("Missing Chapter 6 gate: "+marker);
+for(const marker of ["challengeSkill","challengeToScenario","proposeVersion","buildReplayReport","candidate.runs","activationAllowed:false","lia_create_skill_candidate"]) if(!lab.includes(marker)) throw new Error("Missing Chapter 6 gate: "+marker);
 console.log("Chapter 6 Skill Laboratory: PASS");
