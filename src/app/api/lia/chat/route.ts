@@ -90,8 +90,8 @@ export async function POST(request: Request) {
     const historyContext = history.length > 0
       ? history.map((m) => ({ role: m.role, content: m.content })).slice(-8)
       : [];
-    if (["greeting", "wellbeing", "thanks", "farewell", "identity"].includes(conversationIntent)) {
-      const reply = deterministicConversationReply(conversationIntent as Exclude<typeof conversationIntent, "financial" | "small_talk">);
+    if (["greeting", "wellbeing", "thanks", "farewell", "identity", "small_talk"].includes(conversationIntent)) {
+      const reply = deterministicConversationReply(conversationIntent, requestedQuestion);
       return NextResponse.json({ analysis: reply, model: "lia-conversation", provider: "deterministic", task: "conversation", conversation: { intent: conversationIntent, financialContextUsed: false } });
     }
     try {
