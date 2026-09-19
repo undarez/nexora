@@ -217,6 +217,9 @@ export default function OrchestrationPage() {
                     <p className="mt-1 text-sm font-semibold">Statut : {execution.status} · {execution.stepsExecuted} étape{execution.stepsExecuted > 1 ? "s" : ""} exécutée{execution.stepsExecuted > 1 ? "s" : ""}</p>
                   </div>
                   {execution.nextStep && <Badge variant="outline">Prochaine : étape {execution.nextStep}</Badge>}
+                  {(execution.trace ?? []).some((item: any) => item?.output?.replan?.replanned) && (
+                    <Badge variant="secondary">↻ Replanification gouvernée</Badge>
+                  )}
                 </div>
                 <div className="mt-3 space-y-2">
                   {(execution.trace ?? []).map((item: any, index: number) => (
