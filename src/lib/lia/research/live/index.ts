@@ -4,14 +4,14 @@ import { getResearchDomainPolicy } from "@/lib/lia/research/trust/registry";
 import { planResearch, shouldStopResearch } from "@/lib/lia/research/planner";
 import { discoverTrustedSources } from "@/lib/lia/research/search";
 
-export type LiveResearchInput = { query: string; urls?: string[]; maxSources?: number; timeoutMs?: number; discover?: boolean };
+export type LiveResearchInput = { query: string; urls?: string[]; maxSources?: number; timeoutMs?: number; discover?: boolean; autonomous?: boolean };
 
 export async function runLiveResearch(input: LiveResearchInput) {
   const query = input.query.trim();
   let urls = [...new Set((input.urls ?? []).map(u => u.trim()).filter(Boolean))].slice(0, Math.max(1, Math.min(8, input.maxSources ?? 5)));
   let discovery: {provider:string|null; results:Array<{title:string;url:string;snippet?:string;publishedAt?:string|null;provider:string}>; status:string} = {provider:null,results:[],status:"not_requested"};
   if (!urls.length && input.discover !== false) {
-    discovery = await discoverTrustedSources(query, Math.max(1, Math.min(8, input.maxSources ?? 5)));
+    discovery = await discoverTrustedSources(query, Math.max(1, Math.min(8, input.maxSources ?? 5)), [], input.autonomous ? "autonomous" : "user");
     urls = discovery.results.map(r => r.url);
   }
   const plan = planResearch(query, [], Math.min(5, urls.length || 1));
