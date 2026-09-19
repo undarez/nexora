@@ -152,6 +152,17 @@ async function replanLiaOrchestration(args: {
   };
 }
 
+
+function buildStepEvidence(procedure: string, output: Record<string, unknown>, verified: boolean) {
+  const keys = Object.keys(output).filter(key => key !== "verification").slice(0, 12);
+  return [{
+    kind: "orchestration_step_output",
+    procedure,
+    verified,
+    output_keys: keys,
+  }];
+}
+
 /** Advances exactly one bounded orchestration step. It never executes an external write directly. */
 export async function advanceLiaOrchestration(args: {
   supabase: SupabaseClient;
@@ -170,7 +181,7 @@ export async function advanceLiaOrchestration(args: {
 
   const { data: step, error: stepError } = await args.supabase
     .from("lia_orchestration_steps")
-    .select("id,step_index,procedure_slug,status,risk_class,human_gate_required,objective,verification_rules,input_context,output_context,retry_count,depends_on,agent_key,execution_policy")
+    .select("id,step_index,procedure_slug,status,risk_class,human_gate_required,objective,verification_rules,input_context,output_context,retry_count,depends_on,agent_key,execution_policy,handoff_context,evidence_refs")
     .eq("run_id", run.id).eq("step_index", Number(run.current_step) + 1).maybeSingle();
   if (stepError) throw new Error(stepError.message);
   if (!step) {
@@ -201,8 +212,36 @@ export async function advanceLiaOrchestration(args: {
     return { runId: run.id, status: "blocked", step: { id: step.id, index: step.step_index, procedure: step.procedure_slug ?? "", status: "blocked" }, output: { reason: "Étape bloquée." }, nextStep: null };
   }
 
+  let previousStepOutput: Record<string, unknown> = {};
+  let previousAgentKey: string | null = null;
+  if (step.step_index > 1) {
+    const { data: previousStep } = await args.supabase
+      .from("lia_orchestration_steps")
+      .select("procedure_slug,agent_key,output_context,status")
+      .eq("run_id", run.id)
+      .eq("step_index", step.step_index - 1)
+      .maybeSingle();
+    if (previousStep?.status === "completed") {
+      previousStepOutput = cleanContext(previousStep.output_context);
+      previousAgentKey = typeof previousStep.agent_key === "string" ? previousStep.agent_key : null;
+    }
+  }
+
+  const handoffContext = {
+    from_agent: previousAgentKey,
+    to_agent: step.agent_key ?? null,
+    from_step: step.step_index > 1 ? step.step_index - 1 : null,
+    to_step: step.step_index,
+    verified_source: Object.keys(previousStepOutput).length > 0,
+    evidence: Array.isArray(previousStepOutput.evidence_refs) ? previousStepOutput.evidence_refs : [],
+  };
+
   await args.supabase.from("lia_orchestration_runs").update({ status: "running", updated_at: now }).eq("id", run.id);
-  await args.supabase.from("lia_orchestration_steps").update({ status: "running", input_context: { objective: run.objective, inherited: cleanContext(run.context) } }).eq("id", step.id);
+  await args.supabase.from("lia_orchestration_steps").update({
+    status: "running",
+    input_context: { objective: run.objective, inherited: cleanContext(run.context), previous_step_output: previousStepOutput, handoff: handoffContext },
+    handoff_context: handoffContext,
+  }).eq("id", step.id);
 
   const slug = step.procedure_slug ?? "";
   let output: Record<string, unknown> = {};
@@ -292,7 +331,24 @@ export async function advanceLiaOrchestration(args: {
       return { runId: run.id, status: terminal ? "failed" : "running", step: { id: step.id, index: step.step_index, procedure: nextProcedure, status: terminal ? "failed" : "planned" }, output: recoveryOutput, nextStep: terminal ? null : step.step_index };
     }
     const nextStep = step.step_index < run.max_steps ? step.step_index + 1 : null;
-    await args.supabase.from("lia_orchestration_steps").update({ status: "completed", output_context: { ...output, verification }, verified_at: finishedAt, completed_at: finishedAt }).eq("id", step.id).eq("status", "running");
+    const evidenceRefs = buildStepEvidence(slug, output, true);
+    const outputWithHandoff = {
+      ...output,
+      verification,
+      evidence_refs: evidenceRefs,
+      handoff: {
+        from_agent: step.agent_key ?? null,
+        next_step: nextStep,
+        verified: true,
+      },
+    };
+    await args.supabase.from("lia_orchestration_steps").update({
+      status: "completed",
+      output_context: outputWithHandoff,
+      evidence_refs: evidenceRefs,
+      verified_at: finishedAt,
+      completed_at: finishedAt
+    }).eq("id", step.id).eq("status", "running");
     const proposedResult = { last_step: step.step_index, output, verification };
     const nextStatus = nextStep ? "running" : "completed";
     await args.supabase.from("lia_orchestration_runs").update({ status: nextStatus, current_step: step.step_index, completed_at: nextStep ? null : finishedAt, updated_at: finishedAt, result: proposedResult }).eq("id", run.id);
@@ -303,7 +359,7 @@ export async function advanceLiaOrchestration(args: {
       await persistLiaGoalEvaluation({ supabase: args.supabase, userId: args.userId, runId: run.id, evaluation });
       await recordStrategy({ supabase: args.supabase, userId: args.userId, run, outcome: evaluation.status, context: { evaluation } });
     }
-    return { runId: run.id, status: nextStatus, step: { id: step.id, index: step.step_index, procedure: slug, status: "completed" }, output: { ...output, verification }, nextStep };
+    return { runId: run.id, status: nextStatus, step: { id: step.id, index: step.step_index, procedure: slug, status: "completed" }, output: outputWithHandoff, nextStep };
   }
   await args.supabase.from("lia_orchestration_steps").update({ status: nextStatus, output_context: output }).eq("id", step.id).eq("status", "running");
   const terminalStatus = nextStatus === "awaiting_human" ? "awaiting_human" : "failed";
