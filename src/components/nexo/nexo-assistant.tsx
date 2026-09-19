@@ -200,7 +200,7 @@ export function NexoAssistant() {
   if (dismissed || !enabled) return null;
 
   return <div className="nexo-assistant-shell fixed bottom-[82px] right-4 z-50 md:bottom-6 md:right-6" aria-live="polite">
-    {open && <div id="nexo-chat" className="nexo-chat-panel mb-3 w-[min(94vw,430px)] overflow-hidden rounded-[1.5rem] border bg-card text-card-foreground shadow-2xl animate-in">
+    {open && <div id="nexo-chat" className="nexo-chat-panel mb-3 flex max-h-[calc(100dvh-2rem)] w-[min(92vw,400px)] flex-col overflow-hidden rounded-[1.5rem] border bg-card text-card-foreground shadow-2xl animate-in sm:w-[380px] lg:w-[400px]">
       <div className="flex items-center justify-between border-b bg-primary/5 px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
@@ -211,17 +211,17 @@ export function NexoAssistant() {
         <div className="flex items-center gap-1"><button aria-label="Réduire Nexo" onClick={() => setOpen(false)} className="rounded-lg p-2 hover:bg-accent"><ChevronDown className="h-4 w-4" /></button><button aria-label="Fermer Nexo" onClick={() => setDismissed(true)} className="rounded-lg p-2 hover:bg-accent"><X className="h-4 w-4" /></button></div>
       </div>
 
-      <div className="space-y-3 p-4">
-        <div className="flex items-end gap-3">
-          <div className="h-16 w-14 shrink-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
+        {!chat && <div className="flex items-end gap-3">
+          <div className="h-14 w-12 shrink-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
             <img src={mascot.image} alt="" className="h-full w-full object-contain object-bottom" />
           </div>
           <div className={cn("rounded-2xl rounded-bl-md border p-3", current.tone === "warning" && "border-amber-300 bg-amber-50/60 dark:bg-amber-950/20", current.tone === "success" && "border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20")}>
             <div className="flex gap-2"><Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><p className="text-sm font-semibold">{current.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{current.message}</p><a href={current.actionHref} onClick={() => { if (current.actionHref.startsWith("#")) setChat(true); }} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">{current.actionLabel}<ArrowRight className="h-3.5 w-3.5" /></a></div></div>
           </div>
-        </div>
+        </div>}
 
-        {messages.length > 0 && <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+        {messages.length > 0 && <div className="max-h-[42dvh] space-y-2 overflow-y-auto pr-1 sm:max-h-[38dvh]">
           {messages.map((message, index) => <div key={`${message.role}-${index}`} className={cn("flex gap-2", message.role === "user" ? "justify-end" : "items-end")}>
             {message.role === "assistant" && <div className="h-8 w-7 shrink-0 overflow-hidden rounded-lg border bg-background"><img src={mascot.image} alt="" className="h-full w-full object-contain" /></div>}
             <div className={cn("max-w-[86%] whitespace-pre-wrap rounded-2xl px-3 py-2.5 text-xs leading-5", message.role === "user" ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md bg-muted")}>{message.content}</div>
@@ -326,9 +326,12 @@ export function NexoAssistant() {
           </div>
         </details>}
 
-        {!chat ? <button type="button" onClick={() => setChat(true)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-sm hover:opacity-95"><MessageCircle className="h-4 w-4" />Parler à Nexo</button> : <div className="space-y-2">
-          <div className="flex gap-2">{resumeLoopRunId && <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold text-primary"><RotateCcw className="h-3 w-3" />Mode reprise d’objectif activé</div>}<input value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { const loop = resumeLoopRunId; setResumeLoopRunId(null); void ask(loop); } }} placeholder="Ex. Que dois-je surveiller ?" className="min-w-0 flex-1 rounded-xl border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" disabled={busy} /><button type="button" disabled={busy || !question.trim()} onClick={() => { const loop = resumeLoopRunId; setResumeLoopRunId(null); void ask(loop); }} className="rounded-xl bg-primary px-3 text-primary-foreground disabled:opacity-50" aria-label="Envoyer"><Send className="h-4 w-4" /></button></div>
-          <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground"><span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" />Données et actions restent gouvernées côté serveur.</span><Link href="/settings#mascotte" className="inline-flex items-center gap-1 font-semibold hover:underline"><Settings2 className="h-3 w-3" />Mascotte</Link></div>
+        {!chat ? <button type="button" onClick={() => setChat(true)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-sm hover:opacity-95"><MessageCircle className="h-4 w-4" />Parler à Nexo</button> : <div className="sticky bottom-0 space-y-2 bg-card pt-2">
+          {messages.length > 0 && <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+            {["Mon budget","Mes dépenses","Mes objectifs","Analyser une transaction","Idées d’économies"].map(prompt => <button key={prompt} type="button" disabled={busy} onClick={() => { setQuestion(prompt); }} className="shrink-0 rounded-full border bg-background px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground transition hover:border-primary/40 hover:text-foreground disabled:opacity-50">{prompt}</button>)}
+          </div>}
+          <div className="flex items-end gap-2 rounded-2xl border bg-background p-1.5 focus-within:ring-2 focus-within:ring-ring">{resumeLoopRunId && <span className="sr-only">Mode reprise d’objectif activé</span>}<input value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { const loop = resumeLoopRunId; setResumeLoopRunId(null); void ask(loop); } }} placeholder="Tapez votre message…" className="min-h-10 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" disabled={busy} /><button type="button" disabled={busy || !question.trim()} onClick={() => { const loop = resumeLoopRunId; setResumeLoopRunId(null); void ask(loop); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-50" aria-label="Envoyer"><Send className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between gap-2 px-1 text-[9px] text-muted-foreground"><span className="flex min-w-0 items-center gap-1.5 truncate"><ShieldCheck className="h-3.5 w-3.5 shrink-0" />Données et actions restent gouvernées côté serveur.</span><Link href="/settings#mascotte" className="inline-flex shrink-0 items-center gap-1 font-semibold hover:underline"><Settings2 className="h-3 w-3" />Mascotte</Link></div>
         </div>}
       </div>
     </div>}
