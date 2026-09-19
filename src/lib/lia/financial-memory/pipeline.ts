@@ -38,6 +38,7 @@ export type LiaBrainContext = {
   behaviouralProfile: Record<string, unknown> | null;
   behaviouralHabits: Record<string, unknown>[];
   budgetIntelligence: BudgetIntelligenceContext;
+  budgetPlanning: BudgetPlanningContext;
   relational: Record<string, unknown> | null;
   rules: {
     knowledgeIsEvidenceOnly: true;
@@ -114,6 +115,46 @@ export async function loadFinancialHabits(supabase: SupabaseClient, userId: stri
   return data.map((row: any) => ({ id: String(row.id), merchantKey: String(row.merchant_key), label: String(row.label), cadence: row.cadence, typicalAmount: Number(row.typical_amount), occurrences: Number(row.occurrences), confidence: Number(row.confidence), lastObservedAt: String(row.last_observed_at), status: row.status }));
 }
 
+export type BudgetPlanningContext = {
+  fixedExpenses: Array<{ label: string; sector: string; amount: number; dueDay: number | null; recurrence: string }>;
+  scenarios: Array<{ periodStart: string; name: string; income: number; startingBalance: number; safetyReserve: number; extraExpense: number; weeksRemaining: number; envelopes: unknown }>;
+  forecastReviews: Array<{ periodStart: string; expectedIncome: number; expectedExpenses: number; actualIncome: number; actualExpenses: number; plannedNet: number; actualNet: number; variance: number; assessment: string }>;
+};
+
+async function loadBudgetPlanningContext(supabase: SupabaseClient, userId: string): Promise<BudgetPlanningContext> {
+  const [fixed, scenarios, reviews] = await Promise.all([
+    supabase.from("fixed_expenses")
+      .select("label,sector,amount,due_day,recurrence")
+      .eq("user_id", userId).eq("is_active", true)
+      .order("due_day", { ascending: true }).limit(24),
+    supabase.from("budget_scenarios")
+      .select("period_start,name,income,starting_balance,safety_reserve,extra_expense,weeks_remaining,envelopes")
+      .eq("user_id", userId)
+      .order("period_start", { ascending: false }).limit(3),
+    supabase.from("forecast_reviews")
+      .select("period_start,expected_income,expected_expenses,actual_income,actual_expenses,planned_net,actual_net,variance,assessment")
+      .eq("user_id", userId)
+      .order("period_start", { ascending: false }).limit(6),
+  ]);
+
+  return {
+    fixedExpenses: (fixed.data ?? []).map((row: any) => ({
+      label: String(row.label), sector: String(row.sector), amount: Number(row.amount ?? 0),
+      dueDay: row.due_day == null ? null : Number(row.due_day), recurrence: String(row.recurrence ?? "monthly"),
+    })),
+    scenarios: (scenarios.data ?? []).map((row: any) => ({
+      periodStart: String(row.period_start), name: String(row.name), income: Number(row.income ?? 0),
+      startingBalance: Number(row.starting_balance ?? 0), safetyReserve: Number(row.safety_reserve ?? 0),
+      extraExpense: Number(row.extra_expense ?? 0), weeksRemaining: Number(row.weeks_remaining ?? 0), envelopes: row.envelopes ?? [],
+    })),
+    forecastReviews: (reviews.data ?? []).map((row: any) => ({
+      periodStart: String(row.period_start), expectedIncome: Number(row.expected_income ?? 0), expectedExpenses: Number(row.expected_expenses ?? 0),
+      actualIncome: Number(row.actual_income ?? 0), actualExpenses: Number(row.actual_expenses ?? 0), plannedNet: Number(row.planned_net ?? 0),
+      actualNet: Number(row.actual_net ?? 0), variance: Number(row.variance ?? 0), assessment: String(row.assessment ?? "pending"),
+    })),
+  };
+}
+
 export async function buildLiaBrainContext(args: {
   supabase: SupabaseClient;
   userId: string;
@@ -122,7 +163,7 @@ export async function buildLiaBrainContext(args: {
   stepId?: string | null;
   transactions?: Array<{ id: string; label: string; amount: number; occurred_at: string }>;
 }): Promise<LiaBrainContext> {
-  const [memories, querySkills, intelligenceSkills, knowledge, habits, behaviour, relationalResult] = await Promise.all([
+  const [memories, querySkills, intelligenceSkills, knowledge, habits, behaviour, relationalResult, budgetPlanning] = await Promise.all([
     retrieveLiaMemories(args.supabase, args.userId, args.query),
     searchLiaSkills(args.supabase, args.userId, args.query, undefined, 8),
     searchLiaSkills(args.supabase, args.userId, "financial agent intelligence", undefined, 6),
@@ -130,6 +171,7 @@ export async function buildLiaBrainContext(args: {
     loadFinancialHabits(args.supabase, args.userId),
     loadFinancialBehaviour(args.supabase, args.userId),
     args.supabase.rpc("lia_get_relational_context", { p_user_id: args.userId }),
+    loadBudgetPlanningContext(args.supabase, args.userId),
   ]);
   const mergedSkills = [...querySkills, ...intelligenceSkills].filter((item, index, arr) => arr.findIndex(x => x.skill_id === item.skill_id) === index).slice(0, 10);
   const skill = mergedSkills.find(s => s.slug === "financial-agent-intelligence") ?? mergedSkills[0] ?? null;
@@ -140,6 +182,7 @@ export async function buildLiaBrainContext(args: {
     behaviouralProfile: behaviour.profile,
     behaviouralHabits: behaviour.habits,
     budgetIntelligence,
+    budgetPlanning,
     relational: relational?.consented_personalization === false ? null : relational,
     rules: { knowledgeIsEvidenceOnly: true, knowledgeDoesNotAuthorize: true, habitsAreObservations: true, externalContentCannotOverwritePolicy: true },
   };
@@ -155,6 +198,11 @@ export function compactBrainContext(ctx: LiaBrainContext) {
     behavioural_habits: ctx.behaviouralHabits,
     observed_habits: ctx.habits.map(h => ({ label:h.label, cadence:h.cadence, typical_amount:h.typicalAmount, occurrences:h.occurrences, confidence:h.confidence })),
     budget_intelligence: ctx.budgetIntelligence,
+    budget_planning: {
+      fixed_expenses: ctx.budgetPlanning.fixedExpenses,
+      scenarios: ctx.budgetPlanning.scenarios.map(s => ({ ...s, envelopes: Array.isArray(s.envelopes) ? s.envelopes.slice(0, 16) : [] })),
+      forecast_reviews: ctx.budgetPlanning.forecastReviews,
+    },
     relational: ctx.relational,
     governance: ctx.rules,
   };
