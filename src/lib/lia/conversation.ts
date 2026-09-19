@@ -15,13 +15,20 @@ export function detectLiaConversationIntent(question: string): LiaConversationIn
   return "small_talk";
 }
 
-export function deterministicConversationReply(intent: Exclude<LiaConversationIntent, "financial" | "small_talk">): string {
+export function deterministicConversationReply(intent: Exclude<LiaConversationIntent, "financial">, question = ""): string {
   switch (intent) {
     case "greeting": return "Bonjour 😊 Ravi de te retrouver. Qu’est-ce que tu aimerais faire aujourd’hui ?";
     case "wellbeing": return "Je vais bien, merci 😊 Je suis prête à t’aider. Et toi, comment vas-tu ?";
     case "thanks": return "Avec plaisir 😊";
     case "farewell": return "À bientôt 👋 Prends soin de toi !";
     case "identity": return "Je suis LIA, l’intelligence financière de NEXORA. Je peux discuter naturellement avec toi, t’aider à comprendre tes finances et, lorsque tu me le demandes, analyser les données financières auxquelles tu m’as autorisé l’accès.";
+    case "small_talk": {
+      const q = normalize(question);
+      if (q === "go" || q === "ok go" || q === "go go") return "C’est parti 🚀 Je suis là. On peut reprendre le cerveau NEXORA, la veille, tes finances ou l’amélioration autonome de LIA.";
+      if (q.includes("merci")) return "Avec plaisir 😊 Je reste avec toi pour la suite.";
+      if (q.includes("super") || q.includes("parfait")) return "Parfait 🚀 On continue. Dis-moi ce qu’on attaque ensuite.";
+      return "Je suis là 😊 On peut continuer ensemble. Dis-moi ce que tu veux faire ou ce que tu veux que LIA analyse.";
+    }
   }
 }
 
