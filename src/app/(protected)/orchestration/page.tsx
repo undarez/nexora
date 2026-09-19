@@ -50,6 +50,7 @@ export default function OrchestrationPage() {
   const candidateUseCase = result?.candidateUseCase;
   const skills = result?.skills ?? [];
   const steps = result?.steps ?? [];
+  const executionByStep = new Map<number, any>((execution?.trace ?? []).filter((item: any) => Number.isFinite(Number(item?.step))).map((item: any) => [Number(item.step), item]));
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-28 sm:px-6">
@@ -202,7 +203,7 @@ export default function OrchestrationPage() {
                 <div key={step.index} className="rounded-2xl border p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold">{step.index}. {step.procedure}</p>
-                    <Badge variant={step.status === "blocked" ? "destructive" : "outline"}>{step.status}</Badge>
+                    <Badge variant={(executionByStep.get(step.index)?.status ?? step.status) === "blocked" || (executionByStep.get(step.index)?.status ?? step.status) === "failed" ? "destructive" : "outline"}>{executionByStep.get(step.index)?.status ?? step.status}</Badge>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">Risque : {step.risk_class} · {step.human_gate_required ? "Validation humaine" : "Observation/proposition"}</p>
                 </div>
