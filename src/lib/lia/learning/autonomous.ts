@@ -6,6 +6,7 @@ import { evaluateResearch, type ResearchEvidence } from "@/lib/lia/research/evid
 import { buildKnowledgeGraph } from "@/lib/lia/knowledge-graph";
 import { acceptLearningRecord } from "@/lib/lia/cognitive-core";
 import { buildMetacognitivePlan, recordMetacognitivePlan } from "@/lib/lia/learning/metacognition";
+import { evaluateLiaSkills } from "@/lib/lia/learning/skill-evaluator";
 
 export type LearningTopic = {
   id: string;
@@ -222,6 +223,7 @@ export async function runAutonomousLearningCycle(admin: SupabaseClient, userId: 
 
     const status = research.contradictions.length ? "blocked_contradiction" : verified.length ? "learned" : "candidate_knowledge";
     await admin.from("lia_metacognitive_cycles").update({ status: "evaluated", evaluation: { verified_claims: verified.length, contradictions: research.contradictions.length, sources_acquired: acquisitions, action: metacognitivePlan.action, confidence: verified.length ? 80 : 40 }, next_objective: metacognitivePlan.nextObjective, updated_at: new Date().toISOString() }).eq("id", metacognitiveCycleId).eq("user_id", userId);
+    const skillEvaluation = await evaluateLiaSkills(admin, userId, cycle.id);
     await updateCycle({
       status,
       finished_at: new Date().toISOString(),
@@ -235,7 +237,7 @@ export async function runAutonomousLearningCycle(admin: SupabaseClient, userId: 
       source_refs: sourceRefs,
       guardrails: { trusted_domains_only: true, max_sources: 4, max_bytes: 450000, timeout_ms: 8000, activation_allowed: false, financial_writes_allowed: false },
     });
-    return { status, cycleId: cycle.id, metacognitiveCycleId, topic: topic.id, provider: discovery.provider, sources: acquisitions, candidates, verified: verified.length, contradictions: research.contradictions.length, nextObjective: metacognitivePlan.nextObjective };
+    return { status, cycleId: cycle.id, metacognitiveCycleId, topic: topic.id, provider: discovery.provider, sources: acquisitions, candidates, verified: verified.length, contradictions: research.contradictions.length, nextObjective: metacognitivePlan.nextObjective, skillEvaluation };
   } catch (error) {
     await updateCycle({ status: "failed", finished_at: new Date().toISOString(), error: error instanceof Error ? error.message : "learning_cycle_failed" });
     throw error;
