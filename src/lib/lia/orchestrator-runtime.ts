@@ -170,13 +170,16 @@ export async function runLiaOrchestration(args: {
   const trace: Array<Record<string, unknown>> = [];
   for (let i = 0; i < budget; i++) {
     const result = await advanceLiaOrchestration({ ...args });
-    trace.push({
-      step: result.step?.index ?? null,
-      procedure: result.step?.procedure ?? null,
-      status: result.status,
-      next_step: result.nextStep,
-      output: result.output,
-    });
+    if (result.step) {
+      trace.push({
+        step: result.step.index,
+        procedure: result.step.procedure,
+        status: result.step.status,
+        run_status: result.status,
+        next_step: result.nextStep,
+        output: result.output,
+      });
+    }
     if (["completed", "awaiting_human", "blocked", "failed", "cancelled"].includes(result.status)) {
       return { runId: result.runId, status: result.status, stepsExecuted: trace.length, trace, nextStep: result.nextStep };
     }
