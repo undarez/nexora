@@ -517,3 +517,68 @@ export function skillIntelligenceInvariants() {
     permissionSeparated: true,
   } as const;
 }
+
+
+export type LiaSkillRegistryObservation = {
+  skillId: string;
+  slug: string;
+  name: string;
+  category: string;
+  status: "validated" | "active";
+  trustScore: number;
+  version: number;
+};
+
+export function buildSkillIntelligenceContext(
+  query: string,
+  registeredSkills: LiaSkillRegistryObservation[] = [],
+) {
+  const blueprints = recommendSkillBlueprints(query, 8);
+  const selected = blueprints.map((blueprint) => {
+    const registered = registeredSkills.find((skill) => skill.slug === blueprint.slug) ?? null;
+    return {
+      slug: blueprint.slug,
+      name: blueprint.name,
+      layer: blueprint.layer,
+      riskClass: blueprint.riskClass,
+      activationPolicy: blueprint.activationPolicy,
+      sourceRefs: blueprint.sourceRefs,
+      requiredVerification: blueprint.requiredVerification ?? [],
+      registry: registered
+        ? {
+            skillId: registered.skillId,
+            status: registered.status,
+            trustScore: registered.trustScore,
+            version: registered.version,
+            category: registered.category,
+          }
+        : null,
+    };
+  });
+
+  return {
+    selected,
+    eligibleForAutonomousRead: selected.filter(
+      (skill) =>
+        skill.riskClass === "read" &&
+        skill.registry !== null &&
+        skill.registry.status === "active" &&
+        skill.registry.trustScore >= 70,
+    ).map((skill) => skill.slug),
+    candidateOnly: selected.filter(
+      (skill) =>
+        !skill.registry ||
+        skill.registry.status !== "active" ||
+        skill.riskClass !== "read",
+    ).map((skill) => skill.slug),
+    activation: {
+      modelMayRecommend: true,
+      modelMayCreateCandidate: true,
+      modelMayValidate: false,
+      modelMayActivate: false,
+      humanGateRequired: true,
+      exactVersionRequiredForActiveSkill: true,
+    },
+    invariants: skillIntelligenceInvariants(),
+  } as const;
+}
