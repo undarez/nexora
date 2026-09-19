@@ -13,7 +13,7 @@ function getConfig() {
   const url = (process.env.OLLAMA_API_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
   const model = process.env.OLLAMA_MODEL || "gpt-oss-20b-64k:latest";
   const context = Math.max(4096, Number(process.env.OLLAMA_CONTEXT_LENGTH || 65536));
-  const enabled = process.env.OLLAMA_ENABLED !== "false";
+  const enabled = process.env.OLLAMA_ENABLED === "true" || (process.env.OLLAMA_ENABLED == null && process.env.NODE_ENV !== "production");
   return { url, model, context, enabled };
 }
 
