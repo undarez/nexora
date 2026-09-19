@@ -166,7 +166,10 @@ export async function runLiaOrchestration(args: {
   maxSteps?: number;
   action?: { actionKey?: unknown; title?: unknown; description?: unknown; payload?: unknown };
 }): Promise<AutonomousOrchestrationResult> {
-  const budget = Math.max(1, Math.min(5, Math.floor(args.maxSteps ?? 5)));
+  const requestedBudget = Math.max(1, Math.min(5, Math.floor(args.maxSteps ?? 5)));
+  const { data: persistedRun } = await args.supabase.from("lia_orchestration_runs").select("max_steps,status,current_step").eq("id", args.runId).eq("user_id", args.userId).maybeSingle();
+  const persistedMaxSteps = Number(persistedRun?.max_steps ?? requestedBudget);
+  const budget = Math.max(1, Math.min(requestedBudget, persistedMaxSteps));
   const trace: Array<Record<string, unknown>> = [];
   for (let i = 0; i < budget; i++) {
     const result = await advanceLiaOrchestration({ ...args });
