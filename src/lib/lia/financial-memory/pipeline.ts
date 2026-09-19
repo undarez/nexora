@@ -3,6 +3,7 @@ import { compactMemoryContext, retrieveLiaMemories, type LiaMemoryContext } from
 import { searchLiaSkills, type SkillHit } from "@/lib/lia/skills/registry";
 import { loadFinancialBehaviour } from "./behaviour";
 import { buildBudgetIntelligenceContext, type BudgetIntelligenceContext } from "@/lib/lia/budget-intelligence";
+import { buildSkillIntelligenceContext, type LiaSkillRegistryObservation } from "@/lib/lia/skill-intelligence";
 
 export type FinancialKnowledgeHit = {
   id: string;
@@ -38,6 +39,7 @@ export type LiaBrainContext = {
   behaviouralProfile: Record<string, unknown> | null;
   behaviouralHabits: Record<string, unknown>[];
   budgetIntelligence: BudgetIntelligenceContext;
+  skillIntelligence: ReturnType<typeof buildSkillIntelligenceContext>;
   budgetPlanning: BudgetPlanningContext;
   relational: Record<string, unknown> | null;
   rules: {
@@ -176,12 +178,23 @@ export async function buildLiaBrainContext(args: {
   const mergedSkills = [...querySkills, ...intelligenceSkills].filter((item, index, arr) => arr.findIndex(x => x.skill_id === item.skill_id) === index).slice(0, 10);
   const skill = mergedSkills.find(s => s.slug === "financial-agent-intelligence") ?? mergedSkills[0] ?? null;
   const relational = relationalResult.error || !relationalResult.data ? null : relationalResult.data as Record<string, unknown>;
+  const registeredSkillObservations: LiaSkillRegistryObservation[] = mergedSkills.map((item) => ({
+    skillId: item.skill_id,
+    slug: item.slug,
+    name: item.name,
+    category: item.category,
+    status: item.status,
+    trustScore: item.trust_score,
+    version: item.version,
+  }));
   const budgetIntelligence = buildBudgetIntelligenceContext(args.query, knowledge, habits);
+  const skillIntelligence = buildSkillIntelligenceContext(args.query, registeredSkillObservations);
   return {
     skill, skills: mergedSkills, memories, knowledge, habits,
     behaviouralProfile: behaviour.profile,
     behaviouralHabits: behaviour.habits,
     budgetIntelligence,
+    skillIntelligence,
     budgetPlanning,
     relational: relational?.consented_personalization === false ? null : relational,
     rules: { knowledgeIsEvidenceOnly: true, knowledgeDoesNotAuthorize: true, habitsAreObservations: true, externalContentCannotOverwritePolicy: true },
@@ -198,6 +211,7 @@ export function compactBrainContext(ctx: LiaBrainContext) {
     behavioural_habits: ctx.behaviouralHabits,
     observed_habits: ctx.habits.map(h => ({ label:h.label, cadence:h.cadence, typical_amount:h.typicalAmount, occurrences:h.occurrences, confidence:h.confidence })),
     budget_intelligence: ctx.budgetIntelligence,
+    skill_intelligence: ctx.skillIntelligence,
     budget_planning: {
       fixed_expenses: ctx.budgetPlanning.fixedExpenses,
       scenarios: ctx.budgetPlanning.scenarios.map(s => ({ ...s, envelopes: Array.isArray(s.envelopes) ? s.envelopes.slice(0, 16) : [] })),
