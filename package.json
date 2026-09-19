@@ -141,7 +141,9 @@
     "production:readiness": "node scripts/v5.10.00-final-production-audit.mjs",
     "production:suite": "node scripts/v5.10.01-16-production-suite-regression.mjs",
     "production:release-candidate": "node scripts/v5.11.00-release-candidate-regression.mjs",
-    "user-guide:check": "node scripts/v5.11.02-user-guide-regression.mjs"
+    "user-guide:check": "node scripts/v5.11.02-user-guide-regression.mjs",
+    "lia:chapter5": "node scripts/lia-chapter5-regression.mjs",
+    "lia:chapter6": "node scripts/lia-chapter6-regression.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
