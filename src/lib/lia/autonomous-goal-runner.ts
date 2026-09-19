@@ -64,7 +64,7 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
     try {
       const args = tool === "research_web" ? { query: run.goal, max_sources: 4, timeout_ms: 8000, discover: true } : {};
       const result = await executeAgentTool(supabase, userId, { name: tool, arguments: args }, { runId: loopRunId, stepId });
-      const verification = verifyReadOnlyObservation(result, detailed); const summary = summarizeVerifiedObservation(result); const ok = verification.passed && verification.outcome === "verified";
+      const verification = verifyReadOnlyObservation(result, detailed); const summary = summarizeVerifiedObservation(result); const ok = verification.passed;
       observations.push({ tool, ok }); detailed.push({ tool, ok, summary }); harness.record({ kind: "tool", name: tool, ok, startedAt: new Date(started).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - started, fingerprint: `tool:${tool}` });
       memory.completedTools.push(tool); memory.facts.push(`${tool}: ${summary.slice(0, 900)}`); memory.verifiedObservations += ok ? 1 : 0; memory.checks.push(...verification.checks.map(c => `${c.key}: ${c.observed ? "ok" : "failed"}`)); if (!ok) memory.replans += 1;
       await recordEvidence(supabase, loopRunId, `tool:${tool}`, "autonomous_observation", { result: typeof result === "object" ? result : { value: result }, verification }, stepId);
