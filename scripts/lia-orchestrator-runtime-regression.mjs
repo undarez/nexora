@@ -5,4 +5,6 @@ assert.ok(source.includes('persistedRun'), 'runtime must respect persisted plan 
 assert.ok(source.includes('persistedMaxSteps'), 'runtime must cap execution from persisted plan');
 assert.ok(source.includes('if (result.step)'), 'runtime must not emit phantom trace entries');
 assert.ok(source.includes('status: result.step.status'), 'trace must expose actual step status');
+assert.ok(source.includes('depends_on'), 'runtime must enforce task dependencies');
+assert.ok(source.includes('agent_key'), 'runtime must carry governed agent lane');
 console.log('✓ orchestrator runtime contract');
