@@ -31,6 +31,31 @@ export function registerChapter7SafeSkills(): void {
   });
 
   registerExecutableLiaSkill({
+    id: "ux-copy",
+    name: "UX Copy",
+    description: "Produit des microcopies d'interface structurées sans publication.",
+    capabilities: ["ux-copy", "microcopy"],
+    requiredPermissions: [],
+    riskClass: "read",
+    execute: async (input: unknown) => {
+      const text = asText(input);
+      return { kind: "ux-copy", source: text, suggestions: ["Titre clair et orienté action", "Libellé de bouton explicite", "Message d'état court et compréhensible"], publication: "blocked_until_human_approval" };
+    },
+    verify: async (output) => ({ ok: typeof output === "object" && output !== null, reason: "La microcopy doit rester structurée." }),
+  });
+
+  registerExecutableLiaSkill({
+    id: "email-copy",
+    name: "Email Copy",
+    description: "Prépare un brouillon d'email sans envoi automatique.",
+    capabilities: ["email-draft", "copywriting"],
+    requiredPermissions: [],
+    riskClass: "read",
+    execute: async (input: unknown) => ({ kind: "email-draft", instruction: asText(input), sending: "blocked_until_human_approval" }),
+    verify: async (output) => ({ ok: typeof output === "object" && output !== null, reason: "Le brouillon d'email doit être structuré." }),
+  });
+
+  registerExecutableLiaSkill({
     id: "technical-seo",
     name: "Technical SEO Audit",
     description: "Analyse un contenu fourni et retourne une checklist SEO sans modifier le site.",
@@ -45,6 +70,40 @@ export function registerChapter7SafeSkills(): void {
       return { checks: { title: hasTitle, metaDescription: hasDescription, h1: hasHeading }, next: [!hasTitle && "title", !hasDescription && "meta_description", !hasHeading && "h1"].filter(Boolean) };
     },
     verify: async (output) => ({ ok: typeof output === "object" && output !== null, reason: "L'audit SEO doit produire un résultat structuré." }),
+  });
+
+  registerExecutableLiaSkill({
+    id: "keyword-analysis",
+    name: "Keyword Analysis",
+    description: "Analyse lexicale locale d'un contenu fourni sans recherche externe.",
+    capabilities: ["keywords", "content-analysis"],
+    requiredPermissions: [],
+    riskClass: "read",
+    execute: async (input: unknown) => {
+      const text = asText(input).toLocaleLowerCase("fr-FR").replace(/[^\p{L}\p{N}\s-]/gu, " ");
+      const words = text.split(/\s+/).filter(word => word.length >= 4);
+      const counts = new Map<string, number>();
+      for (const word of words) counts.set(word, (counts.get(word) ?? 0) + 1);
+      const keywords = [...counts.entries()].sort((a,b) => b[1]-a[1]).slice(0, 15).map(([term,count]) => ({ term, count }));
+      return { totalWords: words.length, keywords };
+    },
+    verify: async (output) => ({ ok: typeof output === "object" && output !== null && Array.isArray((output as Record<string, unknown>).keywords), reason: "L'analyse lexicale doit produire une liste de mots-clés." }),
+  });
+
+  registerExecutableLiaSkill({
+    id: "metadata",
+    name: "Metadata",
+    description: "Propose des métadonnées SEO à partir d'un contenu fourni.",
+    capabilities: ["metadata", "seo"],
+    requiredPermissions: [],
+    riskClass: "read",
+    execute: async (input: unknown) => {
+      const text = asText(input);
+      const title = text.replace(/\s+/g, " ").trim().slice(0, 60);
+      const description = text.replace(/\s+/g, " ").trim().slice(0, 155);
+      return { title: title || "NEXORA", description: description || "Gestion financière intelligente avec LIA.", publication: "blocked_until_human_approval" };
+    },
+    verify: async (output) => ({ ok: typeof output === "object" && output !== null, reason: "Les métadonnées doivent être structurées." }),
   });
 
   registerExecutableLiaSkill({
