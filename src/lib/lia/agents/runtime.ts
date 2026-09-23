@@ -1,7 +1,7 @@
 import type { LiaCommandPlan } from "@/lib/lia/command/types.ts";
 import { getLiaAgentDefinition } from "./registry.ts";
 import type { LiaAgentRunResult, LiaAgentStep, LiaSpecialistId } from "./types.ts";
-import type { LiaPermission } from "@/lib/lia/skills/types.ts";
+import type { LiaPermission } from "@/lib/lia/skills/types";
 import { getExecutableLiaSkill } from "../agent/skill-runtime.ts";
 import { calculateEffectiveAutonomy } from "./autonomy.ts";
 
