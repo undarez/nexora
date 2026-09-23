@@ -1,6 +1,6 @@
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import type { LiaPermission } from "@/lib/lia/skills/types";
-import { buildLiaCommandPlan } from "../command/index.ts";
+import { buildLiaCommandPlan } from "../command/index";
 import { executeExecutableLiaSkill } from "../agent/skill-runtime.ts";
 import { registerChapter7SafeSkills } from "./safe-skills.ts";
 import { getLiaAgentDefinition } from "./registry.ts";
