@@ -5,6 +5,7 @@ import { calculateFinanceAnalytics } from "../skills/finance-analytics.ts";
 import { runFinancialReasoning } from "../financial-reasoning.ts";
 import { createGoalLifecycle, advanceGoalLifecycle } from "../goal-lifecycle.ts";
 import { buildLiaFinancialProjection } from "../financial-data-gateway.ts";
+import { deriveTransactionIntelligence, type FinancialFact } from "../../finance/transaction-intelligence.ts";
 import { discoverTrustedSources } from "../research/search/index.ts";
 import { getResearchDomainPolicy } from "../research/trust/registry.ts";
 
@@ -44,6 +45,30 @@ export function registerChapter7SpecialistAdapters(): void {
       return { source: "input", analytics: calculateFinanceAnalytics({ transactions: transactions as never[] }) };
     },
     async output => ({ ok: Boolean(output && typeof output === "object"), reason: "La projection financière doit rester structurée." }));
+
+  register("transaction-intelligence", "Transaction Intelligence", "Déduit les récurrences et anomalies à partir des transactions autorisées.", ["finance.read"],
+    async (input, context) => {
+      const value = objectInput(input);
+      let rows = Array.isArray(value.transactions) ? value.transactions : [];
+      if (!rows.length) {
+        const client = adminClient();
+        if (client) {
+          const { data, error } = await client.from("bank_transactions").select("id,amount,booked_at,category,description").eq("user_id", context.userId).order("booked_at", { ascending: false }).limit(2000);
+          if (error) throw new Error("transaction_intelligence_data:" + error.message);
+          rows = (data ?? []).map(row => ({ id: row.id, amount: Number(row.amount), occurredAt: row.booked_at, label: row.description ?? row.category ?? "Transaction", category: row.category ?? null, source: "bank" }));
+        }
+      }
+      const facts: FinancialFact[] = rows.map((row: any, index: number) => ({ id: String(row.id ?? index), label: String(row.label ?? row.description ?? row.category ?? "Transaction"), amount: number(row.amount), occurredAt: String(row.occurredAt ?? row.booked_at ?? row.date ?? new Date().toISOString()), category: row.category ? String(row.category) : null, source: row.source === "manual" ? "manual" : "bank" }));
+      return deriveTransactionIntelligence(facts);
+    },
+    async output => ({ ok: Boolean(output && typeof output === "object" && "recurring" in (output as object) && "anomalies" in (output as object)), reason: "L'intelligence transactionnelle doit produire récurrences et anomalies." }));
+
+  register("budget-management", "Budget Management", "Prépare une proposition de budget sans effectuer de mutation financière implicite.", ["finance.write"],
+    async input => {
+      const value = objectInput(input);
+      return { action: "budget-management", requestedAmount: number(value.amount ?? value.amountEur), envelope: String(value.envelope ?? "non spécifiée"), mutation: "blocked_until_human_approval", requiresConfirmation: true };
+    },
+    async output => ({ ok: Boolean(output && typeof output === "object" && (output as AnyRecord).requiresConfirmation === true), reason: "Toute modification budgétaire reste soumise à validation humaine." }));
 
   register("financial-reasoning", "Financial Reasoning", "Analyse déterministe des variations, récurrences et anomalies financières.", ["finance.read"],
     async (input, context) => {
