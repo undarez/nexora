@@ -119,7 +119,9 @@ export function registerChapter7SpecialistAdapters(): void {
 
   register("anomaly-detection", "Anomaly Detection", "Détecte des valeurs atypiques par rapport à la médiane des données fournies.", ["data.read"],
     async input => {
-      const rows = rowsInput(input), values = rows.map(row => number(row.amount ?? row.value)).filter(Number.isFinite).sort((a, b) => a - b);\n      const median = values.length ? (values.length % 2 ? values[(values.length - 1) / 2] : (values[values.length / 2 - 1] + values[values.length / 2]) / 2) : 0;\n      const threshold = Math.max(Math.abs(median) * 3, 100);
+      const rows = rowsInput(input), values = rows.map(row => number(row.amount ?? row.value)).filter(Number.isFinite).sort((a, b) => a - b);
+      const median = values.length ? (values.length % 2 ? values[(values.length - 1) / 2] : (values[values.length / 2 - 1] + values[values.length / 2]) / 2) : 0;
+      const threshold = Math.max(Math.abs(median) * 3, 100);
       return { sampleSize: rows.length, median, threshold, anomalies: rows.filter(row => Math.abs(number(row.amount ?? row.value)) >= threshold).slice(0, 20), mutation: "none" };
     },
     async output => ({ ok: Boolean(output && typeof output === "object" && "sampleSize" in (output as object)), reason: "La détection d'anomalies doit être structurée." }));
