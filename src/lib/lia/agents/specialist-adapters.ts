@@ -110,7 +110,7 @@ export function registerChapter7SpecialistAdapters(): void {
 
   register("data-deduplication", "Data Deduplication", "Détecte les doublons déterministes sans supprimer ni modifier les données.", ["data.read"],
     async input => {
-      const rows = rowsInput(input), keys = rows.map(row => String(row.id ?? row.external_id ?? [row.date, row.amount, row.label, row.category].join("|"))), counts = new Map<string, number>();
+      const rows = rowsInput(input), keys = rows.map(row => String(row.id ?? row.external_id ?? [row.date, row.booked_at, row.amount, row.currency, row.label, row.category].map(value => String(value ?? "").trim().toLowerCase()).join("|"))), counts = new Map<string, number>();
       for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
       const duplicates = [...counts.entries()].filter(([, count]) => count > 1).map(([key, count]) => ({ key, count }));
       return { rowCount: rows.length, duplicateGroups: duplicates, duplicateRows: duplicates.reduce((sum, row) => sum + row.count - 1, 0), mutation: "none" };
@@ -119,7 +119,7 @@ export function registerChapter7SpecialistAdapters(): void {
 
   register("anomaly-detection", "Anomaly Detection", "Détecte des valeurs atypiques par rapport à la médiane des données fournies.", ["data.read"],
     async input => {
-      const rows = rowsInput(input), values = rows.map(row => number(row.amount ?? row.value)).filter(Number.isFinite).sort((a, b) => a - b), median = values.length ? values[Math.floor(values.length / 2)] : 0, threshold = Math.max(Math.abs(median) * 3, 100);
+      const rows = rowsInput(input), values = rows.map(row => number(row.amount ?? row.value)).filter(Number.isFinite).sort((a, b) => a - b);\n      const median = values.length ? (values.length % 2 ? values[(values.length - 1) / 2] : (values[values.length / 2 - 1] + values[values.length / 2]) / 2) : 0;\n      const threshold = Math.max(Math.abs(median) * 3, 100);
       return { sampleSize: rows.length, median, threshold, anomalies: rows.filter(row => Math.abs(number(row.amount ?? row.value)) >= threshold).slice(0, 20), mutation: "none" };
     },
     async output => ({ ok: Boolean(output && typeof output === "object" && "sampleSize" in (output as object)), reason: "La détection d'anomalies doit être structurée." }));
