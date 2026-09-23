@@ -15,7 +15,7 @@ function getSupabaseConfig() {
 
 const bearerGate = requireBearerAuth({
   requiredScopes: ["mcp"],
-  resourceMetadataUrl: `${(process.env.NEXORA_MCP_RESOURCE_URL ?? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/mcp`).replace(/\/$/, "")}/../.well-known/oauth-protected-resource`,
+  resourceMetadataUrl: `${(process.env.NEXORA_MCP_RESOURCE_METADATA_URL ?? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/.well-known/oauth-protected-resource`).replace(/\/$/, "")}`,
   verifier: {
     async verifyAccessToken(token) {
       const { url, key } = getSupabaseConfig();
