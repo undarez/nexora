@@ -10,7 +10,7 @@ export type Chapter7ExecutionContext = {
   userId: string;
   requestId?: string;
   locale?: string;
-  permissions?: readonly LiaPermission[];
+  permissions?: readonly LiaPermission[];\n  userAutonomyLevel?: number;
 };
 
 async function getAdminClient() {
@@ -51,7 +51,7 @@ export async function executeSpecialistCommand(input: string, context: Chapter7E
   if (execution.status === "waiting_confirmation") return execution;
 
   try {
-    assertSpecialistCanRun(plan);
+    assertSpecialistCanRun(plan, { permissions: context.permissions, userAutonomyLevel: context.userAutonomyLevel });
   } catch (error) {
     return { ...execution, status: "failed" as const, output: { ...execution.output, error: error instanceof Error ? error.message : String(error) }, verification: { required: true, passed: false, reason: "Gouvernance agentique bloquante." } };
   }
