@@ -10,7 +10,8 @@ export type Chapter7ExecutionContext = {
   userId: string;
   requestId?: string;
   locale?: string;
-  permissions?: readonly LiaPermission[];\n  userAutonomyLevel?: number;
+  permissions?: readonly LiaPermission[];
+  userAutonomyLevel?: number;
 };
 
 async function getAdminClient() {
