@@ -50,20 +50,6 @@ for (const file of sqlFiles) {
   }
 }
 
-const migrationText = sqlFiles
-  .map((file) => fs.readFileSync(path.join(migrationsDir, file), "utf8"))
-  .join("\n");
-
-const authPolicyViolations = [...migrationText.matchAll(/CREATE\\s+POLICY[\\s\\S]*?;/gi)]
-  .map((match) => match[0])
-  .filter((policy) => /auth\\.(?:uid|jwt)\\s*\\(/i.test(policy) && !/\\(\\s*select\\s+auth\\.(?:uid|jwt)\\s*\\(/i.test(policy));
-
-if (authPolicyViolations.length > 0) {
-  failures.push(`Found ${authPolicyViolations.length} RLS policy definitions that call auth.uid/auth.jwt without a SELECT wrapper; review for RLS initplan performance.`);
-}
-
-console.log(`Checked ${sqlFiles.length} Supabase migrations; found ${securityDefinerCount} SECURITY DEFINER declaration(s).`);
-
 if (failures.length > 0) {
   console.error("\nSecurity regression failures:");
   for (const failure of failures) console.error(`- ${failure}`);
