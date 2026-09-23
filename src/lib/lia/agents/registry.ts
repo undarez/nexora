@@ -53,7 +53,7 @@ export const LIA_AGENT_DEFINITIONS: LiaAgentDefinition[] = [
     id: "finance",
     label: "Finance",
     purpose: "Analyser les données financières et piloter les objectifs dans les limites de la politique LIA.",
-    skills: ["finance-analytics", "financial-reasoning", "goal-lifecycle"],
+    skills: ["finance-analytics", "financial-reasoning", "goal-lifecycle", "transaction-intelligence", "budget-management"],
     permissions: ["finance.read", "finance.write"],
     maxSteps: 6,
     maxRetriesPerStep: 2,
