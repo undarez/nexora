@@ -12,6 +12,7 @@ const required = [
   [route, 'requiredScopes: ["mcp"]', "MCP scope enforcement"],
   [route, "auth.getUser(token)", "Supabase token identity validation"],
   [route, 'legacy: "reject"', "legacy transport rejection"],
+  [server, "securitySchemes: [{ type: \"oauth2\", scopes: [\"mcp\"] }]", "per-tool OAuth security scheme"],
   [server, "get_financial_snapshot", "financial snapshot tool"],
   [server, "research_web", "governed web research tool"],
   [server, "learn_skill", "candidate skill learning tool"],
