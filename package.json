@@ -107,7 +107,8 @@
     "lia:autonomous-budget": "node scripts/lia-autonomous-budget-regression.mjs",
     "lia:mobility": "node scripts/lia-mobility-regression.mjs",
     "lia:command-engine": "node --experimental-strip-types scripts/lia-command-engine-regression.mjs",
-    "lia:chapter7-p0": "node scripts/lia-chapter7-p0-regression.mjs"
+    "lia:chapter7-p0": "node scripts/lia-chapter7-p0-regression.mjs",
+    "lia:chapter7-p1": "node scripts/lia-chapter7-p1-specialists-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",

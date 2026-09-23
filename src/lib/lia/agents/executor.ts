@@ -20,35 +20,18 @@ async function getAdminClient() {
   return createAdminClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } });
 }
 
-async function persistSpecialistRun(
-  context: Chapter7ExecutionContext,
-  plan: ReturnType<typeof buildLiaCommandPlan>,
-  result: ReturnType<typeof planSpecialistExecution>,
-  status: "running" | "completed" | "failed",
-  runId?: string,
-): Promise<{ id?: string } | null> {
+async function persistSpecialistRun(context: Chapter7ExecutionContext, plan: ReturnType<typeof buildLiaCommandPlan>, result: ReturnType<typeof planSpecialistExecution>, status: "running" | "completed" | "failed", runId?: string): Promise<{ id?: string } | null> {
   const admin = await getAdminClient();
   if (!admin) return null;
   const payload = {
-    user_id: context.userId,
-    agent_id: plan.route.agent,
-    request_id: context.requestId ?? null,
-    trigger_type: "user_request",
-    objective: plan.intent.intent,
-    status,
-    risk_class: plan.policy.risk,
+    user_id: context.userId, agent_id: plan.route.agent, request_id: context.requestId ?? null, trigger_type: "user_request",
+    objective: plan.intent.intent, status, risk_class: plan.policy.risk,
     confidence: Math.max(0, Math.min(1, Number(plan.intent.confidence) / 100)),
-    requires_confirmation: Boolean(plan.policy.requiresConfirmation),
-    plan: result.output,
+    requires_confirmation: Boolean(plan.policy.requiresConfirmation), plan: result.output,
     output: status === "running" ? {} : result.output,
     verification: result.verification,
     error_message: status === "failed" ? String(result.output.error ?? "specialist_execution_failed") : null,
-    max_steps: 5,
-    max_tool_calls: 8,
-    max_retries: 4,
-    max_replans: 2,
-    max_research_requests: 3,
-    max_memory_writes: 5,
+    max_steps: 5, max_tool_calls: 8, max_retries: 4, max_replans: 2, max_research_requests: 3, max_memory_writes: 5,
     completed_at: status === "completed" || status === "failed" ? new Date().toISOString() : null,
   };
   const query = runId
@@ -64,102 +47,58 @@ export async function executeSpecialistCommand(input: string, context: Chapter7E
   const plan = buildLiaCommandPlan(input);
   const execution = planSpecialistExecution(plan);
   const agent = getLiaAgentDefinition(plan.route.agent);
-
   if (!agent) return execution;
   if (execution.status === "waiting_confirmation") return execution;
 
   try {
     assertSpecialistCanRun(plan);
   } catch (error) {
-    return {
-      ...execution,
-      status: "failed" as const,
-      output: { ...execution.output, error: error instanceof Error ? error.message : String(error) },
-      verification: { required: true, passed: false, reason: "Gouvernance agentique bloquante." },
-    };
+    return { ...execution, status: "failed" as const, output: { ...execution.output, error: error instanceof Error ? error.message : String(error) }, verification: { required: true, passed: false, reason: "Gouvernance agentique bloquante." } };
   }
 
-  const safeSkillIds = new Set(["content-generation", "technical-seo", "system-health", "data-quality"]);
-  if (!safeSkillIds.has(plan.route.skill)) {
+  const executableSpecialistSkills = new Set([
+    "content-generation", "technical-seo", "system-health", "data-quality",
+    "finance-analytics", "financial-reasoning", "goal-lifecycle",
+    "mobility-fuel", "mobility-profile",
+    "tavily-search", "tavily-research", "source-trust",
+    "data-deduplication", "anomaly-detection", "system-diagnostics", "build-analysis",
+  ]);
+  if (!executableSpecialistSkills.has(plan.route.skill)) {
     return { ...execution, status: "planned" as const, output: { ...execution.output, next: "skill_adapter_required" } };
   }
 
   const permissions = context.permissions ?? [];
   const requireBackendGuards = process.env.NODE_ENV === "production" || process.env.LIA_SPECIALIST_REQUIRE_BACKEND_GUARDS === "true";
   const run = await persistSpecialistRun(context, plan, execution, "running");
-
   if (!run?.id && requireBackendGuards) {
-    return {
-      ...execution,
-      status: "failed" as const,
-      output: { ...execution.output, error: "specialist_audit_unavailable" },
-      verification: { required: true, passed: false, reason: "Impossible de créer le journal d'exécution spécialisé." },
-    };
+    return { ...execution, status: "failed" as const, output: { ...execution.output, error: "specialist_audit_unavailable" }, verification: { required: true, passed: false, reason: "Impossible de créer le journal d'exécution spécialisé." } };
   }
 
   const admin = await getAdminClient();
   if (!admin && requireBackendGuards) {
-    return {
-      ...execution,
-      status: "failed" as const,
-      output: { ...execution.output, error: "specialist_budget_unavailable" },
-      verification: { required: true, passed: false, reason: "Le budget d'autonomie spécialisé nécessite le client backend." },
-    };
+    return { ...execution, status: "failed" as const, output: { ...execution.output, error: "specialist_budget_unavailable" }, verification: { required: true, passed: false, reason: "Le budget d'autonomie spécialisé nécessite le client backend." } };
   }
 
   if (!run?.id || !admin) {
-    const output = await executeExecutableLiaSkill(
-      plan.route.skill,
-      { text: input },
-      { userId: context.userId, requestId: context.requestId, locale: context.locale, permissions },
-    );
-    return {
-      ...execution,
-      status: "completed" as const,
-      output: { ...execution.output, result: output },
-      verification: { required: true, passed: true, reason: "Skill exécuté et vérifié par le skill runtime." },
-    };
+    const output = await executeExecutableLiaSkill(plan.route.skill, { text: input }, { userId: context.userId, requestId: context.requestId, locale: context.locale, permissions });
+    return { ...execution, status: "completed" as const, output: { ...execution.output, result: output }, verification: { required: true, passed: true, reason: "Skill exécuté et vérifié par le skill runtime." } };
   }
 
   const consume = async (dimension: string) => {
-    const { data, error } = await admin.rpc("lia_consume_specialist_budget", {
-      p_run_id: run.id,
-      p_user_id: context.userId,
-      p_dimension: dimension,
-      p_amount: 1,
-    });
+    const { data, error } = await admin.rpc("lia_consume_specialist_budget", { p_run_id: run.id, p_user_id: context.userId, p_dimension: dimension, p_amount: 1 });
     if (error) throw new Error("specialist_budget_unavailable: " + error.message);
     return data as { allowed?: boolean; reason?: string; dimension?: string; used?: number; limit?: number; remaining?: number };
   };
 
   try {
-    const stepBudget = await consume("steps");
-    if (stepBudget.allowed !== true) throw new Error("specialist_budget_exhausted:steps");
-
-    const toolBudget = await consume("tool_calls");
-    if (toolBudget.allowed !== true) throw new Error("specialist_budget_exhausted:tool_calls");
-
-    const output = await executeExecutableLiaSkill(
-      plan.route.skill,
-      { text: input },
-      { userId: context.userId, requestId: context.requestId, locale: context.locale, permissions },
-    );
-
-    const completed = {
-      ...execution,
-      status: "completed" as const,
-      output: { ...execution.output, result: output },
-      verification: { required: true, passed: true, reason: "Skill exécuté et vérifié par le skill runtime." },
-    };
+    if ((await consume("steps")).allowed !== true) throw new Error("specialist_budget_exhausted:steps");
+    if ((await consume("tool_calls")).allowed !== true) throw new Error("specialist_budget_exhausted:tool_calls");
+    const output = await executeExecutableLiaSkill(plan.route.skill, { text: input }, { userId: context.userId, requestId: context.requestId, locale: context.locale, permissions });
+    const completed = { ...execution, status: "completed" as const, output: { ...execution.output, result: output }, verification: { required: true, passed: true, reason: "Skill exécuté et vérifié par le skill runtime." } };
     await persistSpecialistRun(context, plan, completed, "completed", run.id);
     return completed;
   } catch (error) {
-    const failed = {
-      ...execution,
-      status: "failed" as const,
-      output: { ...execution.output, error: error instanceof Error ? error.message : String(error) },
-      verification: { required: true, passed: false, reason: "Échec d'exécution, de gouvernance ou de vérification du skill." },
-    };
+    const failed = { ...execution, status: "failed" as const, output: { ...execution.output, error: error instanceof Error ? error.message : String(error) }, verification: { required: true, passed: false, reason: "Échec d'exécution, de gouvernance ou de vérification du skill." } };
     await persistSpecialistRun(context, plan, failed, "failed", run.id);
     return failed;
   }

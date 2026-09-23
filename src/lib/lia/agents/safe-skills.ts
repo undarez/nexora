@@ -1,5 +1,6 @@
 import { registerExecutableLiaSkill } from "../agent/skill-runtime.ts";
 import type { LiaSkillExecutionContext } from "../agent/skill-runtime.ts";
+import { registerChapter7SpecialistAdapters } from "./specialist-adapters.ts";
 
 let registered = false;
 
@@ -24,9 +25,7 @@ export function registerChapter7SafeSkills(): void {
     requiredPermissions: [],
     riskClass: "read",
     execute: async (input: unknown, _context: LiaSkillExecutionContext) => ({
-      kind: "draft",
-      instruction: asText(input),
-      publication: "blocked_until_human_approval",
+      kind: "draft", instruction: asText(input), publication: "blocked_until_human_approval",
     }),
     verify: async (output) => ({ ok: typeof output === "object" && output !== null, reason: "Le brouillon doit être un objet structuré." }),
   });
@@ -76,13 +75,10 @@ export function registerChapter7SafeSkills(): void {
       const rows = Array.isArray(input) ? input : Array.isArray(ensureObject(input).rows) ? ensureObject(input).rows as unknown[] : [];
       const serialized = rows.map((row) => JSON.stringify(row));
       const unique = new Set(serialized).size;
-      return {
-        rowCount: rows.length,
-        duplicateCount: Math.max(0, rows.length - unique),
-        emptyCount: rows.filter((row) => row == null || row === "").length,
-        mutation: "none",
-      };
+      return { rowCount: rows.length, duplicateCount: Math.max(0, rows.length - unique), emptyCount: rows.filter((row) => row == null || row === "").length, mutation: "none" };
     },
     verify: async (output) => ({ ok: typeof output === "object" && output !== null, reason: "Le contrôle qualité doit rester non destructif." }),
   });
+
+  registerChapter7SpecialistAdapters();
 }
