@@ -6,6 +6,7 @@ import { runFinancialReasoning } from "../financial-reasoning.ts";
 import { createGoalLifecycle, advanceGoalLifecycle } from "../goal-lifecycle.ts";
 import { buildLiaFinancialProjection } from "../financial-data-gateway.ts";
 import { discoverTrustedSources } from "../research/search/index.ts";
+import { getResearchDomainPolicy } from "../research/trust/registry.ts";
 
 type AnyRecord = Record<string, unknown>;
 const objectInput = (input: unknown): AnyRecord => {
@@ -87,7 +88,7 @@ export function registerChapter7SpecialistAdapters(): void {
     async input => {
       const value = objectInput(input), query = String(value.query ?? value.text ?? "").trim().slice(0, 500);
       if (!query) throw new Error("research_query_required");
-      return discoverTrustedSources(query, Math.min(Math.max(number(value.limit, 5), 1), 8));
+      return discoverTrustedSources(query, Math.min(Math.max(number(value.limit, 5), 1), 8), ["brave", "web-cage", "bing"]);
     },
     async output => ({ ok: Boolean(output && typeof output === "object" && "status" in (output as object)), reason: "La recherche doit retourner un statut et des résultats gouvernés." }));
 
@@ -95,7 +96,7 @@ export function registerChapter7SpecialistAdapters(): void {
     async input => {
       const value = objectInput(input), query = String(value.query ?? value.text ?? "").trim().slice(0, 500);
       if (!query) throw new Error("research_query_required");
-      const result = await discoverTrustedSources(query, 5);
+      const result = await discoverTrustedSources(query, 5, ["brave", "web-cage", "bing"]);
       return { query, status: result.status, sources: result.results ?? [], usage: result.usage ?? [], limitations: ["Résultats dépendants des fournisseurs configurés.", "La recherche ne confère aucune autorité d'action."] };
     },
     async output => ({ ok: Boolean(output && typeof output === "object" && Array.isArray((output as AnyRecord).sources)), reason: "La recherche doit exposer une liste de sources." }));
@@ -103,7 +104,7 @@ export function registerChapter7SpecialistAdapters(): void {
   register("source-trust", "Source Trust", "Valide les URLs et prépare leur évaluation par le registre de confiance.", ["research.read"],
     async input => {
       const value = objectInput(input), sources = Array.isArray(value.sources) ? value.sources : [value.url ?? value.text];
-      return sources.filter(Boolean).map(raw => { try { const url = new URL(String(raw)); return { url: url.toString(), host: url.hostname, valid: true }; } catch { return { url: String(raw), valid: false }; } });
+      return sources.filter(Boolean).map(raw => { try { const url = new URL(String(raw)); const policy = getResearchDomainPolicy(url.hostname); return { url: url.toString(), host: url.hostname, valid: true, registered: policy.registered, allowed: policy.allowed, reason: policy.reason, trustScore: policy.entry?.trustScore ?? 0, sourceClass: policy.entry?.sourceClass ?? "UNREGISTERED" }; } catch { return { url: String(raw), valid: false }; } });
     },
     async output => ({ ok: Array.isArray(output), reason: "Le contrôle de confiance doit retourner une liste." }));
 
