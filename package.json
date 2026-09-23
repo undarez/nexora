@@ -110,7 +110,8 @@
     "lia:chapter7-p0": "node scripts/lia-chapter7-p0-regression.mjs",
     "lia:chapter7-p1": "node scripts/lia-chapter7-p1-specialists-regression.mjs",
     "lia:chapter7-p2": "node scripts/lia-chapter7-p2-governance-regression.mjs",
-    "lia:chapter7-final": "node --experimental-strip-types scripts/lia-chapter7-final-regression.mjs"
+    "lia:chapter7-final": "node --experimental-strip-types scripts/lia-chapter7-final-regression.mjs",
+    "lia:mcp-connector": "node scripts/lia-mcp-connector-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",
