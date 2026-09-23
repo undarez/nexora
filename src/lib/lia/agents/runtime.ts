@@ -84,8 +84,8 @@ export function assertSpecialistCanRun(plan: LiaCommandPlan, options?: { permiss
   const decision = calculateEffectiveAutonomy({
     agent,
     userAutonomyLevel: options?.userAutonomyLevel,
-    policyCeiling: plan.policy.mode === "critical" ? 0 : plan.policy.risk === "write" ? 1 : 3,
-    risk: plan.policy.risk === "critical" ? "critical" : plan.policy.risk === "write" ? "write" : "read",
+    policyCeiling: plan.policy.mode === "critical" ? 0 : plan.policy.mode === "write" ? 1 : 3,
+    risk: plan.policy.mode === "critical" ? "critical" : plan.policy.mode === "write" ? "write" : "read",
     permissionGranted,
     humanGateOpen: !plan.policy.requiresConfirmation,
     budgetRemaining: options?.budgetRemaining,
