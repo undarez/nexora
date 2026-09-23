@@ -1,0 +1,112 @@
+name: Nexora CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexora-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Typecheck + LIA regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Chapter 7 final regression
+        run: npm run lia:chapter7-final
+
+      - name: Chapter 7 P0 regression
+        run: npm run lia:chapter7-p0
+
+      - name: Chapter 7 P1 regression
+        run: npm run lia:chapter7-p1
+
+      - name: Chapter 7 P2 governance regression
+        run: npm run lia:chapter7-p2
+
+      - name: Orchestration regression
+        run: npm run lia:orchestration
+
+      - name: Verification / recovery regressions
+        run: |
+          npm run lia:verification-resume
+          npm run lia:adaptive-recovery
+          npm run lia:goal-completion
+
+  security:
+    name: Migration security guardrails
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate SQL security guardrails
+        run: node scripts/supabase-security-regression.mjs
+
+      - name: Detect committed secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE 'SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|TAVILY_API_KEY|VERCEL_TOKEN|OPENAI_API_KEY' -- ':!package-lock.json'; then
+            echo "::error::Potential secret material detected in tracked source files."
+            exit 1
+          fi
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [quality, security]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
