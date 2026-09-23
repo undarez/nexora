@@ -10,6 +10,7 @@ const docs = read("src/app/docs/mcp/page.tsx");
 
 const required = [
   [route, 'requiredScopes: ["mcp"]', "MCP scope enforcement"],
+  [route, "resourceMetadataUrl:", "OAuth protected-resource challenge metadata"],
   [route, "auth.getUser(token)", "Supabase token identity validation"],
   [route, 'legacy: "reject"', "legacy transport rejection"],
   [server, '_meta: { securitySchemes: [{ type: "oauth2", scopes: ["mcp"] }] }', "per-tool OAuth compatibility metadata"],
