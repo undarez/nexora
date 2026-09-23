@@ -97,7 +97,7 @@ export function registerChapter7SpecialistAdapters(): void {
       const value = objectInput(input), query = String(value.query ?? value.text ?? "").trim().slice(0, 500);
       if (!query) throw new Error("research_query_required");
       const result = await discoverTrustedSources(query, 5, ["brave", "web-cage", "bing"]);
-      return { query, status: result.status, sources: result.results ?? [], usage: result.usage ?? [], limitations: ["Résultats dépendants des fournisseurs configurés.", "La recherche ne confère aucune autorité d'action."] };
+      return { query, status: result.status, sources: result.results ?? [], limitations: ["Résultats dépendants des fournisseurs configurés.", "La recherche ne confère aucune autorité d'action."] };
     },
     async output => ({ ok: Boolean(output && typeof output === "object" && Array.isArray((output as AnyRecord).sources)), reason: "La recherche doit exposer une liste de sources." }));
 
