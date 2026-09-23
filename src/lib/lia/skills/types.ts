@@ -7,7 +7,16 @@ export type LiaPermission =
   | "banking.write"
   | "web.search"
   | "memory.read"
-  | "memory.write";
+  | "memory.write"
+  | "content.read"
+  | "content.write"
+  | "seo.read"
+  | "system.read"
+  | "system.write"
+  | "data.read"
+  | "data.write"
+  | "mobility.read"
+  | "research.read";
 
 export type LiaSkillContext = {
   userId: string;
