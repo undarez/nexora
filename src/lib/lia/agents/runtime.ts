@@ -1,6 +1,9 @@
 import type { LiaCommandPlan } from "@/lib/lia/command/types.ts";
 import { getLiaAgentDefinition } from "./registry.ts";
 import type { LiaAgentRunResult, LiaAgentStep, LiaSpecialistId } from "./types.ts";
+import type { LiaPermission } from "@/lib/lia/skills/types.ts";
+import { getExecutableLiaSkill } from "../agent/skill-runtime.ts";
+import { calculateEffectiveAutonomy } from "./autonomy.ts";
 
 function buildStep(agentId: LiaSpecialistId, skillId: string, requiresConfirmation: boolean): LiaAgentStep {
   return {
@@ -74,4 +77,18 @@ export function assertSpecialistCanRun(plan: LiaCommandPlan, options?: { permiss
   if (plan.policy.requiresConfirmation) {
     throw new Error("Confirmation humaine requise avant exécution.");
   }
+  const skill = getExecutableLiaSkill(plan.route.skill);
+  if (!skill) throw new Error("Skill exécutable introuvable : " + plan.route.skill);
+  const permissions = options?.permissions ?? [];
+  const permissionGranted = skill.requiredPermissions.every(permission => permissions.includes(permission));
+  const decision = calculateEffectiveAutonomy({
+    agent,
+    userAutonomyLevel: options?.userAutonomyLevel,
+    policyCeiling: plan.policy.mode === "critical" ? 0 : plan.policy.risk === "write" ? 1 : 3,
+    risk: plan.policy.risk === "critical" ? "critical" : plan.policy.risk === "write" ? "write" : "read",
+    permissionGranted,
+    humanGateOpen: !plan.policy.requiresConfirmation,
+    budgetRemaining: options?.budgetRemaining,
+  });
+  if (!decision.allowed) throw new Error("Autonomie spécialisée insuffisante : " + decision.reason);
 }
