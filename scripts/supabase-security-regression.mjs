@@ -24,23 +24,23 @@ for (const file of sqlFiles) {
   const fullPath = path.join(migrationsDir, file);
   const sql = fs.readFileSync(fullPath, "utf8");
 
-  const definerMatches = sql.match(/SECURITY\\s+DEFINER/gi) ?? [];
+  const definerMatches = sql.match(/SECURITY\s+DEFINER/gi) ?? [];
   securityDefinerCount += definerMatches.length;
 
   if (definerMatches.length > 0) {
-    const functionBlocks = sql.split(/CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\b/gi).slice(1);
+    const functionBlocks = sql.split(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b/gi).slice(1);
 
     for (const block of functionBlocks) {
       const header = block.slice(0, 12000);
-      if (/SECURITY\\s+DEFINER/i.test(header) && !/SET\\s+search_path\\s*=/i.test(header)) {
+      if (/SECURITY\s+DEFINER/i.test(header) && !/SET\s+search_path\s*=/i.test(header)) {
         failures.push(`${file}: SECURITY DEFINER function without explicit SET search_path`);
       }
     }
   }
 
   const dangerousGrants = [
-    /GRANT\\s+EXECUTE\\s+ON\\s+FUNCTION[^;]*\\bTO\\s+anon\\b/i,
-    /GRANT\\s+EXECUTE\\s+ON\\s+FUNCTION[^;]*\\bTO\\s+public\\b/i,
+    /GRANT\s+EXECUTE\s+ON\s+FUNCTION[^;]*\bTO\s+anon\b/i,
+    /GRANT\s+EXECUTE\s+ON\s+FUNCTION[^;]*\bTO\s+public\b/i,
   ];
 
   for (const pattern of dangerousGrants) {
