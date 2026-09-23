@@ -26,7 +26,9 @@ function planMission(objective: string): LiaMissionTask[] {
   return rules.map((rule, index) => ({
     id: rule.agentId + "-" + (index + 1),
     intent: rule.intent,
-    input: objective + "\n\nSous-mission: " + rule.suffix,
+    input: objective + "
+
+Sous-mission: " + rule.suffix,
     agentId: rule.agentId,
     skillId: rule.skillId,
     dependsOn: index === 0 ? [] : [rules[0].agentId + "-1"],
@@ -92,7 +94,8 @@ export async function runAutonomousMission(objective: string, context: { userId:
       if (alternative && agent?.skills.includes(alternative) && await consume(admin, missionId, context.userId, "replans")) {
         replans.push({ reason: String(result.output?.error ?? "specialist_failed"), fromTask: task.id, toSkill: alternative });
         actual = { ...task, skillId: alternative };
-        result = await executeSpecialistCommand(task.input + "\nReplan contrôlé: utiliser " + alternative + ".", context);
+        result = await executeSpecialistCommand(task.input + "
+Replan contrôlé: utiliser " + alternative + ".", context);
       }
     }
 
