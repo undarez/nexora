@@ -382,7 +382,7 @@ export async function runLiaMission(
 
     let memoryWritten = false;
     if (missionId && admin) {
-      memoryWritten = await writeSupervisorMemory(admin, context, objective, status, evidence, replans);
+      memoryWritten = await writeSupervisorMemory(admin, context, objective, status, evidence, replans, missionId);
       await updateRun(admin, context, missionId, status, stepIndex, lastOutput, replans.at(-1)?.reason);
     }
 
