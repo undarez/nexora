@@ -3,7 +3,19 @@ import assert from "node:assert/strict";
 
 const supervisor = fs.readFileSync("src/lib/lia/agents/supervisor.ts", "utf8");
 const types = fs.readFileSync("src/lib/lia/agents/supervisor-types.ts", "utf8");
-for (const marker of ["runAutonomousMission", "lia_orchestration_runs", "lia_orchestration_budgets", "lia_orchestration_steps", "fallback", "replans", "critique", "lia_specialist_work_memory"]) assert.ok(supervisor.includes(marker), marker);
-for (const marker of ["LiaMissionTask", "LiaMissionEvidence", "LiaMissionResult"]) assert.ok(types.includes(marker), marker);
-assert.ok(supervisor.includes("executeSpecialistCommand"));
+
+for (const marker of [
+  "runLiaMission",
+  "runAutonomousMission",
+  "executeSpecialistCommand",
+  "evidence",
+  "replans",
+  "critique",
+  "memoryWritten",
+]) assert.ok(supervisor.includes(marker), marker);
+
+for (const marker of ["LiaMissionTask", "LiaMissionEvidence", "LiaMissionResult", "LiaMissionOptions"]) {
+  assert.ok(types.includes(marker), marker);
+}
+
 console.log("P2 AUTONOMOUS SUPERVISOR REGRESSION: PASS");
