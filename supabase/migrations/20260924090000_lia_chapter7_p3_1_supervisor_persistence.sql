@@ -18,7 +18,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_run_id uuid;
-  v_max_steps integer := greatest(1, least(coalesce(p_max_steps, 5), 50));
+  v_max_steps integer := greatest(1, least(coalesce(p_max_steps, 5), 5));
   v_max_replans integer := greatest(0, least(coalesce(p_max_replans, 2), 10));
 begin
   if p_user_id is null then raise exception 'invalid_user_id'; end if;
@@ -90,7 +90,7 @@ begin
   where id = p_run_id;
 
   if v_run_user is null or v_run_user <> p_user_id then raise exception 'orchestration_run_not_found'; end if;
-  if p_step_index < 0 or p_step_index > 50 then raise exception 'invalid_step_index'; end if;
+  if p_step_index < 1 or p_step_index > 5 then raise exception 'invalid_step_index'; end if;
   if p_objective is null or length(trim(p_objective)) < 1 then raise exception 'invalid_step_objective'; end if;
 
   insert into public.lia_orchestration_steps(
@@ -162,7 +162,7 @@ begin
   set
     status = case when p_status in ('planned','running','waiting','completed','partial','failed','blocked','cancelled')
       then p_status else 'failed' end,
-    current_step = case when p_current_step is null then current_step else greatest(0, least(p_current_step, 50)) end,
+    current_step = case when p_current_step is null then current_step else greatest(0, least(p_current_step, 5)) end,
     context = coalesce(p_context, context),
     result = coalesce(p_result, result),
     replan_reason = case when p_replan_reason is null then replan_reason else left(p_replan_reason, 1000) end,
@@ -224,6 +224,7 @@ revoke all on function public.lia_orchestration_request_replan(uuid,uuid,text) f
 grant execute on function public.lia_orchestration_request_replan(uuid,uuid,text) to service_role;
 
 create or replace function public.lia_orchestration_write_work_memory(
+  p_run_id uuid,
   p_user_id uuid,
   p_memory jsonb
 ) returns boolean
@@ -232,17 +233,17 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
+  v_budget jsonb;
   v_budget_run uuid;
 begin
   select b.run_id into v_budget_run
   from public.lia_orchestration_budgets b
-  where b.user_id = p_user_id
-  order by b.updated_at desc
-  limit 1;
+  where b.run_id = p_run_id and b.user_id = p_user_id;
 
   if v_budget_run is null then return false; end if;
 
-  if coalesce((public.lia_consume_orchestration_budget(v_budget_run, p_user_id, 'memory_writes', 1)->>'allowed')::boolean, false) is not true then
+  v_budget := public.lia_consume_orchestration_budget(v_budget_run, p_user_id, 'memory_writes', 1);
+  if coalesce((v_budget->>'allowed')::boolean, false) is not true then
     return false;
   end if;
 
@@ -255,5 +256,5 @@ begin
 end;
 $$;
 
-revoke all on function public.lia_orchestration_write_work_memory(uuid,jsonb) from public, anon, authenticated;
-grant execute on function public.lia_orchestration_write_work_memory(uuid,jsonb) to service_role;
+revoke all on function public.lia_orchestration_write_work_memory(uuid,uuid,jsonb) from public, anon, authenticated;
+grant execute on function public.lia_orchestration_write_work_memory(uuid,uuid,jsonb) to service_role;
