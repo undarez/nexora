@@ -30,7 +30,7 @@ async function loadHistoricalReliability(context: Chapter7ExecutionContext, agen
   const admin = await getAdminClient();
   if (!admin) return undefined;
   const { data, error } = await admin.from("lia_specialist_runs").select("status").eq("user_id", context.userId).eq("agent_id", agentId).order("created_at", { ascending: false }).limit(20);
-  if (error || !data?.length) return undefined;
+  if (error || !data?.length || data.length < 3) return undefined;
   const successful = data.filter((row: { status?: string }) => row.status === "completed").length;
   return Math.round((successful / data.length) * 100);
 }
