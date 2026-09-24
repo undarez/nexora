@@ -32,7 +32,7 @@ for (const file of sqlFiles) {
 
     for (const block of functionBlocks) {
       const header = block.slice(0, 12000);
-      if (/SECURITY\s+DEFINER/i.test(header) && !/SET\s+search_path\s*=/i.test(header)) {
+      if (/SECURITY\s+DEFINER/i.test(header) && !/SET\s+search_path\s*(?:=|TO)\s*/i.test(header)) {
         failures.push(`${file}: SECURITY DEFINER function without explicit SET search_path`);
       }
     }
