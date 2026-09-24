@@ -56,14 +56,6 @@ export function decideLiaContinuousOperation(stats: ContinuousStats, controls: {
   return { operation: "idle", reason: "schedule", priority: 10, explanation: "Aucune opération prioritaire détectée.", evidence };
 }
 
-function adminClientFromEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secret = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !secret) return null;
-  const { createClient } = require("@supabase/supabase-js") as typeof import("@supabase/supabase-js");
-  return createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } });
-}
-
 async function loadStats(admin: SupabaseClient, userId: string): Promise<ContinuousStats> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -121,9 +113,7 @@ export async function runLiaContinuousCycle(args: {
   userId: string;
   forcedOperation?: LiaContinuousOperation;
 }) {
-  const admin = adminClientFromEnv();
-  if (!admin) throw new Error("continuous_operations_backend_unavailable");
-
+  const admin = args.supabase;
   const controls = await getLiaRuntimeControls(admin);
   if (!controls.cron_autonomy_enabled) {
     return { status: "blocked" as const, operation: "idle" as const, reason: "admin_global_kill_switch" };
