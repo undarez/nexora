@@ -52,5 +52,5 @@ export async function ensureLiaAutonomousCron(supabase: SupabaseClient, userId: 
   } else {
     const staleJobs = goalJobs.filter(job => ["ready", "running"].includes(job.status)); for (const job of staleJobs) await admin.from("lia_runtime_jobs").update({ status: "paused", last_status: "no_active_autonomous_goals", updated_at: new Date().toISOString() }).eq("id", job.id); goalWatchScheduled = false;
   }
-  return { status: surveillanceCreated || learningCreated || goalWatchCreated ? "created" as const : "unchanged" as const, jobId: surveillanceJobId, schedule: hasFinancialContext ? (activity >= 20 ? "0 8 * * *" : "0 8 * * 1") : null, learningScheduled, learningCreated, surveillanceCreated, goalWatchScheduled, goalWatchCreated, activeAutonomousGoals };
+  return { status: surveillanceCreated || learningCreated || goalWatchCreated || continuousOperationsCreated ? "created" as const : "unchanged" as const, jobId: surveillanceJobId, schedule: hasFinancialContext ? (activity >= 20 ? "0 8 * * *" : "0 8 * * 1") : null, learningScheduled, learningCreated, surveillanceCreated, goalWatchScheduled, goalWatchCreated, continuousOperationsScheduled, continuousOperationsCreated, activeAutonomousGoals };
 }
