@@ -47,6 +47,8 @@ jobs:
 
       - name: Chapter 7 P2 governance regression
         run: npm run lia:chapter7-p2
+      - name: Chapter 7 P3.1 supervisor regression
+        run: npm run lia:chapter7-p3-1-supervisor
 
       - name: Orchestration regression
         run: npm run lia:orchestration
