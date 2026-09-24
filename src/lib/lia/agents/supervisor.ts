@@ -128,7 +128,7 @@ async function persistStep(
   const { data, error } = await admin.rpc("lia_orchestration_upsert_step", {
     p_run_id: missionId,
     p_user_id: context.userId,
-    p_step_index: stepIndex,
+    p_step_index: stepIndex + 1,
     p_objective: task.input,
     p_status: status,
     p_risk_class: riskFromResult(status),
@@ -186,7 +186,7 @@ async function updateRun(
     p_run_id: missionId,
     p_user_id: context.userId,
     p_status: status,
-    p_current_step: currentStep,
+    p_current_step: Math.max(1, Math.min(currentStep, 5)),
     p_context: { request_id: context.requestId ?? null, locale: context.locale ?? null },
     p_result: compact(result, MAX_OUTPUT_LENGTH),
     p_replan_reason: replanReason ?? null,
@@ -242,7 +242,7 @@ export async function runLiaMission(
   options: LiaMissionOptions = {},
 ): Promise<LiaMissionResult> {
   const inputs = splitMissionObjective(objective);
-  const maxSteps = Math.max(0, Math.min(options.maxSteps ?? 5, 50));
+  const maxSteps = Math.max(0, Math.min(options.maxSteps ?? 5, 5));
   const maxReplans = Math.max(0, Math.min(options.maxReplans ?? 2, 10));
 
   if (!inputs.length || maxSteps === 0) {
@@ -285,6 +285,7 @@ export async function runLiaMission(
   try {
     while (taskPosition < tasks.length && stepIndex < maxSteps) {
       const task = tasks[taskPosition];
+      const persistedStepIndex = stepIndex + 1;
 
       if (missionId && admin) {
         const stepBudget = await consumeOrchestrationBudget(admin, missionId, context.userId, "steps");
