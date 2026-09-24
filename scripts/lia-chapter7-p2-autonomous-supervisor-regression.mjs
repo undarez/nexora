@@ -7,15 +7,20 @@ const types = fs.readFileSync("src/lib/lia/agents/supervisor-types.ts", "utf8");
 for (const marker of [
   "runLiaMission",
   "runAutonomousMission",
+  "buildLiaCommandPlan",
   "executeSpecialistCommand",
-  "evidence",
+  "splitMissionObjective",
+  "critiqueMission",
   "replans",
-  "critique",
-  "memoryWritten",
+  "maxReplans",
+  "waiting_confirmation",
 ]) assert.ok(supervisor.includes(marker), marker);
 
 for (const marker of ["LiaMissionTask", "LiaMissionEvidence", "LiaMissionResult", "LiaMissionOptions"]) {
   assert.ok(types.includes(marker), marker);
 }
 
-console.log("P2 AUTONOMOUS SUPERVISOR REGRESSION: PASS");
+assert.ok(!supervisor.includes('agentId: "finance"'));
+assert.ok(!supervisor.includes('skillId: "finance-analytics"'));
+
+console.log("P3 SUPERVISOR ROUTING REGRESSION: PASS");
