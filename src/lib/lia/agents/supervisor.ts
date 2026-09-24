@@ -298,7 +298,7 @@ export async function runLiaMission(
         await persistStep(admin, context, missionId, task, stepIndex, "running", {}, {}, evidence.at(-1)?.output);
       }
 
-      const result = await executeSpecialistCommand(task.input, context);
+      const result = await executeSpecialistCommand(task.input, context, { forcedIntent: task.intent as LiaCommandIntent });
       lastOutput = result.output;
       evidence.push({
         taskId: task.id,
