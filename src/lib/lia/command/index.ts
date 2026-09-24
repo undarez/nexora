@@ -1,7 +1,7 @@
-import { detectLiaIntent } from "./intent-detector";
-import { policyForIntent } from "./policy";
-import { routeLiaIntent } from "./router";
-import type { LiaCommandPlan } from "./types";
+import { detectLiaIntent } from "./intent-detector.ts";
+import { policyForIntent } from "./policy.ts";
+import { routeLiaIntent } from "./router.ts";
+import type { LiaCommandPlan } from "./types.ts";
 export * from "./types";
 export * from "./intent-detector";
 export * from "./policy";
