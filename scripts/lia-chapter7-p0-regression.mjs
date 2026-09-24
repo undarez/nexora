@@ -8,7 +8,7 @@ const migration = fs.readFileSync(path.join(root, "supabase/migrations/0120_lia_
 const gitignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
-assert.match(executor, /assertSpecialistCanRun\(plan\)/);
+assert.match(executor, /assertSpecialistCanRun\(plan(?:,|\))/);
 assert.match(executor, /permissions\?: readonly LiaPermission\[\]/);
 assert.doesNotMatch(executor, /permissions\?: readonly any\[\]/);
 assert.match(executor, /executeExecutableLiaSkill/);
