@@ -8,6 +8,7 @@ export type LiaAutonomyInputs = {
   risk: LiaRiskClass;
   permissionGranted: boolean;
   humanGateOpen: boolean;
+  confidence?: number;
   budgetRemaining?: number;
 };
 
@@ -22,6 +23,7 @@ export type LiaAutonomyDecision = {
     permission: number;
     humanGate: number;
     budget: number;
+    confidence: number;
   };
   reason: string;
 };
@@ -49,6 +51,7 @@ export function calculateEffectiveAutonomy(input: LiaAutonomyInputs): LiaAutonom
     permission: input.permissionGranted ? 3 : 0,
     humanGate: input.humanGateOpen ? 3 : 0,
     budget: input.budgetRemaining === undefined ? 3 : Math.max(0, Math.floor(input.budgetRemaining)),
+    confidence: input.confidence === undefined ? 3 : input.confidence < 70 ? 0 : input.confidence < 85 ? 1 : input.confidence < 95 ? 2 : 3,
   };
   const effectiveLevel = Math.min(...Object.values(ceilings));
 
