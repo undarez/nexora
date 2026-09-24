@@ -138,7 +138,7 @@ async function persistStep(
     p_output_context: compact(output, MAX_OUTPUT_LENGTH),
     p_parent_step_id: parentStepId ?? null,
     p_depends_on: task.dependsOn
-      .map((id) => Number(id.match(/mission-task-(\d+)/)?.[1] ?? 0) - 1)
+      .map((id) => Number(id.match(/mission-task-(\d+)/)?.[1] ?? 0))
       .filter((value) => Number.isInteger(value) && value >= 0),
     p_agent_key: task.agentId,
     p_execution_policy: {
@@ -203,6 +203,7 @@ async function writeSupervisorMemory(
   replans: LiaMissionResult["replans"],
 ) {
   const { data, error } = await admin.rpc("lia_orchestration_write_work_memory", {
+    p_run_id: missionId,
     p_user_id: context.userId,
     p_memory: {
       objective: compact(objective, 1200),
@@ -285,8 +286,6 @@ export async function runLiaMission(
   try {
     while (taskPosition < tasks.length && stepIndex < maxSteps) {
       const task = tasks[taskPosition];
-      const persistedStepIndex = stepIndex + 1;
-
       if (missionId && admin) {
         const stepBudget = await consumeOrchestrationBudget(admin, missionId, context.userId, "steps");
         const toolBudget = await consumeOrchestrationBudget(admin, missionId, context.userId, "tool_calls");
