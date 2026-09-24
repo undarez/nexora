@@ -226,6 +226,7 @@ grant execute on function public.lia_orchestration_request_replan(uuid,uuid,text
 create or replace function public.lia_orchestration_write_work_memory(
   p_run_id uuid,
   p_user_id uuid,
+  p_agent_id text,
   p_memory jsonb
 ) returns boolean
 language plpgsql
@@ -248,7 +249,7 @@ begin
   end if;
 
   insert into public.lia_specialist_work_memory(user_id, agent_id, memory, updated_at)
-  values(p_user_id, 'supervisor', coalesce(p_memory, '{}'::jsonb), now())
+  values(p_user_id, p_agent_id, coalesce(p_memory, '{}'::jsonb), now())
   on conflict (user_id, agent_id) do update
     set memory = excluded.memory, updated_at = now();
 
@@ -256,5 +257,5 @@ begin
 end;
 $$;
 
-revoke all on function public.lia_orchestration_write_work_memory(uuid,uuid,jsonb) from public, anon, authenticated;
-grant execute on function public.lia_orchestration_write_work_memory(uuid,uuid,jsonb) to service_role;
+revoke all on function public.lia_orchestration_write_work_memory(uuid,uuid,text,jsonb) from public, anon, authenticated;
+grant execute on function public.lia_orchestration_write_work_memory(uuid,uuid,text,jsonb) to service_role;
