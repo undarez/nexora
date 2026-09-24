@@ -205,6 +205,7 @@ async function writeSupervisorMemory(
   const { data, error } = await admin.rpc("lia_orchestration_write_work_memory", {
     p_run_id: missionId,
     p_user_id: context.userId,
+    p_agent_id: evidence.at(-1)?.agentId ?? "finance",
     p_memory: {
       objective: compact(objective, 1200),
       status,
