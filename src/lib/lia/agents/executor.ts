@@ -115,6 +115,11 @@ export async function executeSpecialistCommand(
   try {
     if ((await consume("steps")).allowed !== true) throw new Error("specialist_budget_exhausted:steps");
     if ((await consume("tool_calls")).allowed !== true) throw new Error("specialist_budget_exhausted:tool_calls");
+    if (plan.route.skill === "tavily-search" || plan.route.skill === "tavily-research") {
+      if ((await consume("research_requests")).allowed !== true) {
+        throw new Error("specialist_budget_exhausted:research_requests");
+      }
+    }
     const output = await executeExecutableLiaSkill(plan.route.skill, { text: input }, { userId: context.userId, requestId: context.requestId, locale: context.locale, permissions });
     const completed = { ...execution, status: "completed" as const, output: { ...execution.output, result: output }, verification: { required: true, passed: true, reason: "Skill exécuté et vérifié par le skill runtime." } };
     await persistSpecialistRun(context, plan, completed, "completed", run.id);
