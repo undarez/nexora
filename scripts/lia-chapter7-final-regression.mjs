@@ -4,6 +4,7 @@ import fs from "node:fs";
 const registry = fs.readFileSync("src/lib/lia/agents/registry.ts", "utf8");
 const safeSkills = fs.readFileSync("src/lib/lia/agents/safe-skills.ts", "utf8");
 const executor = fs.readFileSync("src/lib/lia/agents/executor.ts", "utf8");
+const adapters = fs.readFileSync("src/lib/lia/agents/specialist-adapters.ts", "utf8");
 const router = fs.readFileSync("src/lib/lia/command/router.ts", "utf8");
 
 const expectedAgents = [
@@ -43,7 +44,10 @@ const expectedSkills = [
 
 for (const agent of expectedAgents) assert.ok(registry.includes(`id: "${agent}"`) || registry.includes(`id:"${agent}"`), `agent missing: ${agent}`);
 for (const skill of expectedSkills) {
-  assert.ok(safeSkills.includes(`"${skill}"`) || executor.includes(`"${skill}"`), `skill not executable: ${skill}`);
+  assert.ok(
+    safeSkills.includes(`"${skill}"`) || adapters.includes(`"${skill}"`) || executor.includes(`"${skill}"`),
+    `skill not executable: ${skill}`,
+  );
 }
 
 const routedInputs = [
