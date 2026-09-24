@@ -1,6 +1,9 @@
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import type { LiaPermission } from "@/lib/lia/skills/types";
 import { buildLiaCommandPlan } from "../command/index";
+import { policyForIntent } from "../command/policy";
+import { routeLiaIntent } from "../command/router";
+import type { LiaCommandIntent } from "../command/types";
 import { executeExecutableLiaSkill } from "../agent/skill-runtime.ts";
 import { registerChapter7SafeSkills } from "./safe-skills.ts";
 import { getLiaAgentDefinition } from "./registry.ts";
@@ -43,9 +46,27 @@ async function persistSpecialistRun(context: Chapter7ExecutionContext, plan: Ret
   return data ? { id: String(data.id) } : null;
 }
 
-export async function executeSpecialistCommand(input: string, context: Chapter7ExecutionContext) {
+export async function executeSpecialistCommand(
+  input: string,
+  context: Chapter7ExecutionContext,
+  options: { forcedIntent?: LiaCommandIntent } = {},
+) {
   registerChapter7SafeSkills();
-  const plan = buildLiaCommandPlan(input);
+  const detectedPlan = buildLiaCommandPlan(input);
+  const forcedIntent = options.forcedIntent;
+  const plan = forcedIntent
+    ? {
+        ...detectedPlan,
+        intent: {
+          ...detectedPlan.intent,
+          intent: forcedIntent,
+          domain: forcedIntent.split(".")[0] as typeof detectedPlan.intent.domain,
+          reason: "Governed supervisor replan selected a bounded fallback intent.",
+        },
+        policy: policyForIntent(forcedIntent),
+        route: routeLiaIntent(forcedIntent),
+      }
+    : detectedPlan;
   const execution = planSpecialistExecution(plan);
   const agent = getLiaAgentDefinition(plan.route.agent);
   if (!agent) return execution;
@@ -94,6 +115,11 @@ export async function executeSpecialistCommand(input: string, context: Chapter7E
   try {
     if ((await consume("steps")).allowed !== true) throw new Error("specialist_budget_exhausted:steps");
     if ((await consume("tool_calls")).allowed !== true) throw new Error("specialist_budget_exhausted:tool_calls");
+    if (plan.route.skill === "tavily-search" || plan.route.skill === "tavily-research") {
+      if ((await consume("research_requests")).allowed !== true) {
+        throw new Error("specialist_budget_exhausted:research_requests");
+      }
+    }
     const output = await executeExecutableLiaSkill(plan.route.skill, { text: input }, { userId: context.userId, requestId: context.requestId, locale: context.locale, permissions });
     const completed = { ...execution, status: "completed" as const, output: { ...execution.output, result: output }, verification: { required: true, passed: true, reason: "Skill exécuté et vérifié par le skill runtime." } };
     await persistSpecialistRun(context, plan, completed, "completed", run.id);
