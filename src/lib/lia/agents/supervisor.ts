@@ -201,6 +201,7 @@ async function writeSupervisorMemory(
   status: string,
   evidence: LiaMissionEvidence[],
   replans: LiaMissionResult["replans"],
+  missionId: string,
 ) {
   const { data, error } = await admin.rpc("lia_orchestration_write_work_memory", {
     p_run_id: missionId,
