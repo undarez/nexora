@@ -141,8 +141,8 @@ begin
 end;
 $$;
 
-revoke all on function public.lia_orchestration_upsert_step(uuid,uuid,integer,text,text,text,boolean,jsonb,jsonb,jsonb,uuid,integer[],text,jsonb,jsonb,integer,text,text,text) from public, anon, authenticated;
-grant execute on function public.lia_orchestration_upsert_step(uuid,uuid,integer,text,text,text,boolean,jsonb,jsonb,jsonb,uuid,integer[],text,jsonb,jsonb,integer,text,text,text) to service_role;
+revoke all on function public.lia_orchestration_upsert_step(uuid,uuid,integer,text,text,text,boolean,jsonb,jsonb,jsonb,uuid,integer[],text,jsonb,jsonb,jsonb,integer,text,text,text) from public, anon, authenticated;
+grant execute on function public.lia_orchestration_upsert_step(uuid,uuid,integer,text,text,text,boolean,jsonb,jsonb,jsonb,uuid,integer[],text,jsonb,jsonb,jsonb,integer,text,text,text) to service_role;
 
 create or replace function public.lia_orchestration_update_run(
   p_run_id uuid,
