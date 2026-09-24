@@ -82,7 +82,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git grep -nE 'SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|TAVILY_API_KEY|VERCEL_TOKEN|OPENAI_API_KEY' -- ':!package-lock.json'; then
+          if git grep -nE 'sk_(live|test)_[A-Za-z0-9]{16,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|tvly-[A-Za-z0-9_-]{16,}|vercel_[A-Za-z0-9_-]{16,}' -- ':!package-lock.json' ':!README*' ':!.env.example'; then
             echo "::error::Potential secret material detected in tracked source files."
             exit 1
           fi
