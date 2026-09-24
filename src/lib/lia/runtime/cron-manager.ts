@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nextCronRun } from "@/lib/lia/runtime/cron-scheduler";
 
-export type LiaCronAction = "autonomous_learning" | "proactive_financial_watch" | "goal_watch" | "agent_goal" | "bank_sync";
-const ALLOWED_ACTIONS = new Set<LiaCronAction>(["autonomous_learning","proactive_financial_watch","goal_watch","agent_goal","bank_sync"]);
+export type LiaCronAction = "autonomous_learning" | "proactive_financial_watch" | "goal_watch" | "agent_goal" | "bank_sync" | "continuous_operations";
+const ALLOWED_ACTIONS = new Set<LiaCronAction>(["autonomous_learning","proactive_financial_watch","goal_watch","agent_goal","bank_sync","continuous_operations"]);
 function cleanName(value:string){return value.replace(/[^\p{L}\p{N} .:_-]/gu,"").trim().slice(0,120)||"LIA · Tâche planifiée";}
 function cleanDescription(value:string){return value.replace(/[\u0000-\u001F\u007F]/g," ").trim().slice(0,500);}
 function validateAction(action:unknown):asserts action is LiaCronAction{if(typeof action!=="string"||!ALLOWED_ACTIONS.has(action as LiaCronAction))throw new Error("Action Cron LIA non autorisée.");}
