@@ -15,6 +15,7 @@ export type Chapter7ExecutionContext = {
   locale?: string;
   permissions?: readonly LiaPermission[];
   userAutonomyLevel?: number;
+  historicalReliability?: number;
 };
 
 async function getAdminClient() {
@@ -22,6 +23,16 @@ async function getAdminClient() {
   const secret = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !secret) return null;
   return createAdminClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } });
+}
+
+async function loadHistoricalReliability(context: Chapter7ExecutionContext, agentId: string) {
+  if (context.historicalReliability !== undefined) return context.historicalReliability;
+  const admin = await getAdminClient();
+  if (!admin) return undefined;
+  const { data, error } = await admin.from("lia_specialist_runs").select("status").eq("user_id", context.userId).eq("agent_id", agentId).order("created_at", { ascending: false }).limit(20);
+  if (error || !data?.length) return undefined;
+  const successful = data.filter((row: { status?: string }) => row.status === "completed").length;
+  return Math.round((successful / data.length) * 100);
 }
 
 async function persistSpecialistRun(context: Chapter7ExecutionContext, plan: ReturnType<typeof buildLiaCommandPlan>, result: ReturnType<typeof planSpecialistExecution>, status: "running" | "completed" | "failed", runId?: string): Promise<{ id?: string } | null> {
@@ -73,7 +84,7 @@ export async function executeSpecialistCommand(
   if (execution.status === "waiting_confirmation") return execution;
 
   try {
-    assertSpecialistCanRun(plan, { permissions: context.permissions, userAutonomyLevel: context.userAutonomyLevel });
+    assertSpecialistCanRun(plan, { permissions: context.permissions, userAutonomyLevel: context.userAutonomyLevel, historicalReliability: await loadHistoricalReliability(context, plan.route.agent) });
   } catch (error) {
     return { ...execution, status: "failed" as const, output: { ...execution.output, error: error instanceof Error ? error.message : String(error) }, verification: { required: true, passed: false, reason: "Gouvernance agentique bloquante." } };
   }
