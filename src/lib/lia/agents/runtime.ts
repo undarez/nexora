@@ -65,7 +65,7 @@ export function planSpecialistExecution(plan: LiaCommandPlan): LiaAgentRunResult
   };
 }
 
-export function assertSpecialistCanRun(plan: LiaCommandPlan, options?: { permissions?: readonly LiaPermission[]; userAutonomyLevel?: number; budgetRemaining?: number }): void {
+export function assertSpecialistCanRun(plan: LiaCommandPlan, options?: { permissions?: readonly LiaPermission[]; userAutonomyLevel?: number; historicalReliability?: number; budgetRemaining?: number }): void {
   const agent = getLiaAgentDefinition(plan.route.agent);
   if (!agent) throw new Error("Agent spécialisé introuvable : " + plan.route.agent);
   if (!agent.skills.includes(plan.route.skill)) {
@@ -88,6 +88,7 @@ export function assertSpecialistCanRun(plan: LiaCommandPlan, options?: { permiss
     risk: plan.policy.mode === "critical" ? "critical" : plan.policy.mode === "write" ? "write" : "read",
     permissionGranted,
     humanGateOpen: !plan.policy.requiresConfirmation,
+    historicalReliability: options?.historicalReliability,
     budgetRemaining: options?.budgetRemaining,
   });
   if (!decision.allowed) throw new Error("Autonomie spécialisée insuffisante : " + decision.reason);

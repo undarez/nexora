@@ -1,0 +1,33 @@
+import { readFile } from "node:fs/promises";
+
+const files = {
+  engine: await readFile("src/lib/lia/continuous-operations.ts", "utf8"),
+  migration: await readFile("supabase/migrations/20260924100000_lia_chapter7_p4_continuous_operations.sql", "utf8"),
+  route: await readFile("src/app/api/lia/runtime/continuous/route.ts", "utf8"),
+  autonomy: await readFile("src/lib/lia/agents/autonomy.ts", "utf8"),
+  runtime: await readFile("src/lib/lia/agents/runtime.ts", "utf8"),
+  executor: await readFile("src/lib/lia/agents/executor.ts", "utf8"),
+  cron: await readFile("src/app/api/lia/runtime/cron/route.ts", "utf8"),
+  autoCron: await readFile("src/lib/lia/runtime/auto-cron.ts", "utf8"),
+};
+
+const checks = [
+  ["durable wake table", files.migration.includes("lia_autonomous_wakes")],
+  ["single running wake per user", files.migration.includes("lia_autonomous_wakes_one_running_user_idx")],
+  ["wake preparation loads governed controls", files.engine.includes("prepareLiaWake") && files.engine.includes("getLiaRuntimeControls")],
+  ["recovery has priority", files.engine.includes("stats.recentFailures >= 2")],
+  ["active goals are continued", files.engine.includes("runAutonomousGoal")],
+  ["learning remains governed", files.engine.includes("runAutonomousLearningCycle")],
+  ["proactive observation is bounded", files.engine.includes("runProactiveFinancialLoop")],
+  ["learning does not auto-activate skills", files.engine.includes("runAutonomousLearningCycle")],
+  ["runtime endpoint uses cron secret", files.route.includes("LIA_CRON_SECRET") && files.route.includes("CRON_SECRET")],
+  ["cron dispatches continuous operation", files.cron.includes("continuous_operations") && files.cron.includes("runLiaContinuousCycle")],
+  ["auto-cron provisions continuous operation", files.autoCron.includes("continuous_operations") && files.autoCron.includes("45 21 * * *")],
+  ["continuous operation is explicitly bounded", files.engine.includes("continuousOperationBudget")],
+  ["adaptive autonomy uses historical reliability", files.autonomy.includes("historicalReliability") && files.runtime.includes("historicalReliability")],
+  ["executor derives reliability from specialist history", files.executor.includes("lia_specialist_runs") && files.executor.includes("loadHistoricalReliability")],
+];
+
+for (const [label, ok] of checks) console.log(`${ok ? "PASS" : "FAIL"} ${label}`);
+if (checks.some(([, ok]) => !ok)) process.exit(1);
+console.log("Chapter 7 P4 continuous operations regression OK");

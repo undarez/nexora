@@ -9,6 +9,7 @@ export type LiaAutonomyInputs = {
   permissionGranted: boolean;
   humanGateOpen: boolean;
   confidence?: number;
+  historicalReliability?: number;
   budgetRemaining?: number;
 };
 
@@ -24,6 +25,7 @@ export type LiaAutonomyDecision = {
     humanGate: number;
     budget: number;
     confidence: number;
+    reliability: number;
   };
   reason: string;
 };
@@ -52,6 +54,7 @@ export function calculateEffectiveAutonomy(input: LiaAutonomyInputs): LiaAutonom
     humanGate: input.humanGateOpen ? 3 : 0,
     budget: input.budgetRemaining === undefined ? 3 : Math.max(0, Math.floor(input.budgetRemaining)),
     confidence: input.confidence === undefined ? 3 : input.confidence < 70 ? 0 : input.confidence < 85 ? 1 : input.confidence < 95 ? 2 : 3,
+    reliability: input.historicalReliability === undefined ? 3 : input.historicalReliability < 60 ? 0 : input.historicalReliability < 80 ? 1 : input.historicalReliability < 92 ? 2 : 3,
   };
   const effectiveLevel = Math.min(...Object.values(ceilings));
 
@@ -59,6 +62,7 @@ export function calculateEffectiveAutonomy(input: LiaAutonomyInputs): LiaAutonom
   if (!input.permissionGranted) reason = "Permission requise absente.";
   else if (!input.humanGateOpen) reason = "Human Gate fermé.";
   else if (input.risk === "critical") reason = "Risque critique : autonomie opérationnelle interdite.";
+  else if (input.historicalReliability !== undefined && input.historicalReliability < 60) reason = "Fiabilité historique insuffisante pour une exécution autonome.";
   else if (effectiveLevel === 0) reason = "Aucun niveau d'autonomie opérationnelle disponible.";
 
   return { allowed: effectiveLevel > 0, effectiveLevel, ceilings, reason };
