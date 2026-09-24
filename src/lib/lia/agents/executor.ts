@@ -1,6 +1,9 @@
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import type { LiaPermission } from "@/lib/lia/skills/types";
 import { buildLiaCommandPlan } from "../command/index";
+import { policyForIntent } from "../command/policy";
+import { routeLiaIntent } from "../command/router";
+import type { LiaCommandIntent } from "../command/types";
 import { executeExecutableLiaSkill } from "../agent/skill-runtime.ts";
 import { registerChapter7SafeSkills } from "./safe-skills.ts";
 import { getLiaAgentDefinition } from "./registry.ts";
@@ -43,9 +46,27 @@ async function persistSpecialistRun(context: Chapter7ExecutionContext, plan: Ret
   return data ? { id: String(data.id) } : null;
 }
 
-export async function executeSpecialistCommand(input: string, context: Chapter7ExecutionContext) {
+export async function executeSpecialistCommand(
+  input: string,
+  context: Chapter7ExecutionContext,
+  options: { forcedIntent?: LiaCommandIntent } = {},
+) {
   registerChapter7SafeSkills();
-  const plan = buildLiaCommandPlan(input);
+  const detectedPlan = buildLiaCommandPlan(input);
+  const forcedIntent = options.forcedIntent;
+  const plan = forcedIntent
+    ? {
+        ...detectedPlan,
+        intent: {
+          ...detectedPlan.intent,
+          intent: forcedIntent,
+          domain: forcedIntent.split(".")[0] as typeof detectedPlan.intent.domain,
+          reason: "Governed supervisor replan selected a bounded fallback intent.",
+        },
+        policy: policyForIntent(forcedIntent),
+        route: routeLiaIntent(forcedIntent),
+      }
+    : detectedPlan;
   const execution = planSpecialistExecution(plan);
   const agent = getLiaAgentDefinition(plan.route.agent);
   if (!agent) return execution;
