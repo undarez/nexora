@@ -26,7 +26,7 @@ import { runNexoraDecisionKernel } from "@/lib/lia/decision-kernel";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
 import { buildLiaFinancialProjection, sanitizeToolResultsForLia } from "@/lib/lia/financial-data-gateway";
 import { buildLiaPersonalFinancialModel, compactLiaPersonalFinancialModel } from "@/lib/lia/personal-financial-model";
-import { detectLiaConversationIntent, deterministicConversationReply, isLikelyInternalLiaOutput, selectHumanLiaResponse, LIA_CONVERSATION_SYSTEM_PROMPT } from "@/lib/lia/conversation";
+import { detectLiaConversationIntent, deterministicConversationReply, selectHumanLiaResponse, LIA_CONVERSATION_SYSTEM_PROMPT } from "@/lib/lia/conversation";
 import { runFinancialReasoning, formatFinancialReasoning } from "@/lib/lia/financial-reasoning";
 import { runRiskReasoning, formatRiskReasoning } from "@/lib/lia/risk-reasoning";
 import { runBudgetReasoning, formatBudgetReasoning } from "@/lib/lia/budget-reasoning";
