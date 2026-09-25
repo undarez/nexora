@@ -26,7 +26,7 @@ import { runNexoraDecisionKernel } from "@/lib/lia/decision-kernel";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
 import { buildLiaFinancialProjection, sanitizeToolResultsForLia } from "@/lib/lia/financial-data-gateway";
 import { buildLiaPersonalFinancialModel, compactLiaPersonalFinancialModel } from "@/lib/lia/personal-financial-model";
-import { detectLiaConversationIntent, deterministicConversationReply, LIA_CONVERSATION_SYSTEM_PROMPT } from "@/lib/lia/conversation";
+import { detectLiaConversationIntent, deterministicConversationReply, isLikelyInternalLiaOutput, selectHumanLiaResponse, LIA_CONVERSATION_SYSTEM_PROMPT } from "@/lib/lia/conversation";
 import { runFinancialReasoning, formatFinancialReasoning } from "@/lib/lia/financial-reasoning";
 import { runRiskReasoning, formatRiskReasoning } from "@/lib/lia/risk-reasoning";
 import { runBudgetReasoning, formatBudgetReasoning } from "@/lib/lia/budget-reasoning";
@@ -100,7 +100,17 @@ export async function POST(request: Request) {
         ...historyContext,
         { role: "user", content: requestedQuestion },
       ]);
-      return NextResponse.json({ analysis: result.content, model: result.model, provider: result.provider, task: "conversation", conversation: { intent: conversationIntent, financialContextUsed: false } });
+      const safeResponse = selectHumanLiaResponse(
+        result.content,
+        deterministicConversationReply("small_talk", requestedQuestion),
+      );
+      return NextResponse.json({
+        analysis: safeResponse.content,
+        model: safeResponse.rejectedGenerated ? "lia-conversation-safety-fallback" : result.model,
+        provider: safeResponse.rejectedGenerated ? "deterministic" : result.provider,
+        task: "conversation",
+        conversation: { intent: conversationIntent, financialContextUsed: false, generatedResponseRejected: safeResponse.rejectedGenerated },
+      });
     } catch (error) {
       return NextResponse.json({ analysis: "Je suis là 😊 Dis-moi ce que tu as en tête.", model: "lia-conversation-fallback", provider: "deterministic", task: "conversation", conversation: { intent: conversationIntent, financialContextUsed: false }, warning: error instanceof Error ? error.message : "Mode conversationnel limité." });
     }
@@ -681,9 +691,10 @@ export async function POST(request: Request) {
           { role: "system", content: `Mission active : ${AGENT_TASK_LABELS[task]}. Tu peux enrichir l'analyse déterministe, mais reste soumis au superviseur.` },
           { role: "user", content: `${userPrompt}\n\nANALYSE DÉTERMINISTE DE BASE :\n${analysis}` },
         ], AbortSignal.timeout(60000));
-        analysis = result.content;
-        model = result.model;
-        provider = result.provider;
+        const safeGenerated = selectHumanLiaResponse(result.content, analysis);
+        analysis = safeGenerated.content;
+        model = safeGenerated.rejectedGenerated ? deterministic.model : result.model;
+        provider = safeGenerated.rejectedGenerated ? "deterministic" : result.provider;
         providerUsage = result.usage ?? null;
         workers = [{ task, label: AGENT_TASK_LABELS[task], status: "completed", content: analysis, model, durationMs: 0 }];
       } catch (enhancementError) {
