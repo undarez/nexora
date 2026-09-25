@@ -50,7 +50,7 @@ function isTask(value: unknown): value is AgentTask {
 async function executeChatToolsWithHarness(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  toolNames: string[],
+  toolNames: readonly string[],
   runId: string | null,
 ) {
   if (!supabase) throw new Error("Supabase n'est pas configuré.");
@@ -72,7 +72,7 @@ async function executeChatToolsWithHarness(
         executeAgentTool(supabase, userId, { name: toolName }, { runId }),
         timeout,
       ]);
-      harness.record({ index: 0, kind: "tool", name: toolName, ok: true, startedAt: new Date(startedAt).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, fingerprint });
+      harness.record({ kind: "tool", name: toolName, ok: true, startedAt: new Date(startedAt).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, fingerprint });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Outil indisponible.";
       results[toolName] = { error: message };
