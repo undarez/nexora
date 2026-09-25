@@ -12,7 +12,8 @@ assert.match(route, /new AgentHarness\(\{ maxSteps: 8, maxToolCalls: 8, maxWallT
 assert.match(route, /harness: toolExecution\.harness/, "chat harness trace must be observable");
 assert.match(route, /\?\.state === "verified"/, "research claim state must be propagated");
 assert.match(autonomous, /claimByEvidenceId/, "autonomous learning must map evidence to adjudicated claims");
-assert.match(autonomous, /publisher.*hostname/, "autonomous corroboration must use independent source identity");
+assert.match(autonomous, /publisher = String\(e\.source\.publisher/, "autonomous corroboration must use publisher identity");
+assert.match(autonomous, /hostname\.toLowerCase\(\)/, "autonomous corroboration must use hostname identity");
 
 assert.match(brain, /REQUIRE_AUTH = .*NEXORA_BRAIN_REQUIRE_AUTH/, "Brain auth requirement must be explicit");
 assert.match(brain, /if REQUIRE_AUTH and not API_KEY:/, "Brain must fail closed when auth is required but missing");
