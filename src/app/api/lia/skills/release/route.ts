@@ -9,8 +9,7 @@ export const dynamic = "force-dynamic";
 const ACTIONS = new Set(["start_canary", "release", "rollback", "reject"]);
 
 export async function POST(request: Request) {
-  const csrf = assertSameOrigin(request);
-  if (!csrf.ok) return NextResponse.json({ error: "Requête non autorisée." }, { status: 403 });
+  try { assertSameOrigin(request); } catch { return NextResponse.json({ error: "Requête non autorisée." }, { status: 403 }); }
 
   const supabase = await createClient();
   if (!supabase) return NextResponse.json({ error: "Supabase non configuré." }, { status: 503 });
