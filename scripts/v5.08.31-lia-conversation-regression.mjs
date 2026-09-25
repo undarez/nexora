@@ -12,6 +12,7 @@ const checks=[
  ['financial lane exists',conv.includes('financial')],
  ['chat route imports conversation',route.includes('@/lib/lia/conversation')],
  ['conversation lane avoids financial context',route.includes('financialContextUsed: false')],
+ ['chat route applies human output guard',route.includes('selectHumanLiaResponse') && route.includes('generatedResponseRejected')],
  ['provider can answer small talk',route.includes('LIA_CONVERSATION_SYSTEM_PROMPT')],
  ['generated internal dumps are rejected',conv.includes('isLikelyInternalLiaOutput') && conv.includes('selectHumanLiaResponse')],
  ['spending distribution is humanized',deterministic.includes('asksSpendingDistribution') && deterministic.includes('Où part ton argent ?')],
