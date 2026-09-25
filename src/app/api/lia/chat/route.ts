@@ -76,7 +76,7 @@ async function executeChatToolsWithHarness(
     } catch (error) {
       const message = error instanceof Error ? error.message : "Outil indisponible.";
       results[toolName] = { error: message };
-      harness.record({ index: 0, kind: "tool", name: toolName, ok: false, startedAt: new Date(startedAt).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, fingerprint, error: message.slice(0, 500) });
+      harness.record({ kind: "tool", name: toolName, ok: false, startedAt: new Date(startedAt).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, fingerprint, error: message.slice(0, 500) });
     }
   }
 
