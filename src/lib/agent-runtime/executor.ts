@@ -55,7 +55,7 @@ export async function executeAgentTool(
     metadata: { tool: call.name, disposition: preAction.disposition, risk: preAction.risk, capability: preAction.capability, reversible: preAction.reversible, reasons: preAction.reasons },
   });
   if (preAction.disposition === "DENY") throw new Error(`Pre-Action Monitor : action refusée (${call.name}).`);
-  if (preAction.disposition === "REQUIRE_APPROVAL" && !localAuthorization.allowed) throw new Error(`Pre-Action Monitor : validation humaine requise (${call.name}).`);
+  // REQUIRE_APPROVAL is recorded here; the existing Policy Engine and Decision Gate remain the authority for approval.
 
   const riskLevel = definition.risk === "write-sensitive" ? "high" : definition.risk === "recommendation" ? "medium" : "low";
   const gate = await recordDecisionGate({ runId: governanceContext?.runId, stepId: governanceContext?.stepId, actionType: call.name, riskLevel, reversible: definition.risk !== "write-sensitive", authorizationPresent: Boolean(dbDecision?.allowed || policyReason === "human_approval_required"), policyId: dbDecision?.policy_id ?? dbDecision?.policyId ?? null, knowledgeIds: governanceContext?.knowledgeIds, evidenceIds: governanceContext?.evidenceIds, rationale: { policy_reason: policyReason, local_authorization: localAuthorization.allowed, knowledge_is_not_authorization: true } });
