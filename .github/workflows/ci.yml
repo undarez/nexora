@@ -51,6 +51,8 @@ jobs:
         run: npm run lia:chapter7-p3-1-supervisor
       - name: Chapter 7 P4 continuous operations regression
         run: npm run lia:chapter7-p4-continuous
+      - name: Audit P0 regression
+        run: npm run lia:audit-p0
 
       - name: Orchestration regression
         run: npm run lia:orchestration
