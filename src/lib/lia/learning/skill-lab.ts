@@ -121,6 +121,29 @@ export async function runSkillImprovementLab(admin:SupabaseClient,userId:string,
       sandboxVerified,
     });
     const eligible=releaseGate.eligibleForHumanReview;
+    const { data: releaseCandidate } = await admin.from("lia_skill_release_candidates").insert({
+      user_id:userId,
+      skill_id:newSkillId,
+      baseline_version_id:baseline.id,
+      candidate_version_id:newVersion?.id??null,
+      lab_run_id:lab.id,
+      status: eligible ? "human_review" : "blocked",
+      baseline_score:replay.baseline.score,
+      candidate_score:replay.candidate.score,
+      score_delta:replay.comparison.delta,
+      regressions:replay.comparison.regressions,
+      gates: releaseEvidence,
+    }).select("id").single();
+    if (releaseCandidate?.id) {
+      await admin.from("lia_skill_release_events").insert({
+        user_id:userId,
+        candidate_id:releaseCandidate.id,
+        action:"created",
+        actor_type:"system",
+        reason: eligible ? "Candidate eligible for explicit human review." : "Candidate blocked by release gates.",
+        evidence: releaseEvidence,
+      });
+    }
     if(eligible){
       await admin.from("lia_learning_review_board").insert({
         skill_id:newSkillId,skill_version_id:newVersion?.id??null,title:`Amélioration candidate — ${skillRow.name}`,category:skillRow.category,
@@ -135,7 +158,7 @@ export async function runSkillImprovementLab(admin:SupabaseClient,userId:string,
       evidence:{...releaseEvidence,baseline_fingerprint:replay.baselineFingerprint,candidate_fingerprint:replay.candidateFingerprint,challenge_fingerprints:challenges.map(x=>fingerprint(x.input)),challenge_scenarios:challengeScenarios.map(({input:_input,...scenario})=>scenario),challenge_replay:replay.candidate.runs,activation_allowed:false},
       completed_at:new Date().toISOString()
     }).eq("id",lab.id);
-    return {status:"completed",labId:lab.id,candidateSkillId:newSkillId,candidateVersionId:newVersion?.id??null,replay:replay.comparison,eligibleForHumanReview:eligible,sandboxVerified,releaseGate,activationAllowed:false};
+    return {status:"completed",labId:lab.id,candidateSkillId:newSkillId,candidateVersionId:newVersion?.id??null,releaseCandidateId:releaseCandidate?.id??null,replay:replay.comparison,eligibleForHumanReview:eligible,sandboxVerified,releaseGate,activationAllowed:false};
   }catch(error){
     await admin.from("lia_skill_lab_runs").update({status:"failed",completed_at:new Date().toISOString(),evidence:{error:error instanceof Error?error.message:"skill_lab_failed",activation_allowed:false}}).eq("id",lab.id);
     throw error;
