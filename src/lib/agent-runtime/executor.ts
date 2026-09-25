@@ -11,6 +11,7 @@ import { recordFinancialBehaviourEvent } from "@/lib/lia/financial-memory/pipeli
 import { searchLiaUseCases, buildUseCaseCandidate } from "@/lib/lia/use-cases/registry";
 import { runLiveResearch } from "@/lib/lia/research/live";
 import { getLiaRuntimeControls } from "@/lib/lia/runtime/controls";
+import { assessPreAction } from "@/lib/lia/pre-action-monitor";
 
 export type ToolCall = { name: string; arguments?: Record<string, unknown> };
 
@@ -39,6 +40,23 @@ export async function executeAgentTool(
   if (!dbDecision?.allowed && policyReason !== "human_approval_required") throw new Error(`Policy agent refusée par Supabase : ${policyReason}`);
   const definition = getAgentTool(call.name);
   if (!definition) throw new Error(`Outil agentique inconnu : ${call.name}`);
+  const preAction = assessPreAction({
+    tool: call.name,
+    description: definition.description,
+    risk: definition.risk,
+    requiresUserApproval: definition.requiresUserApproval,
+    deterministic: definition.deterministic,
+  });
+  await recordFinancialBehaviourEvent({
+    runId: governanceContext?.runId,
+    stepId: governanceContext?.stepId,
+    eventType: "tool_call",
+    severity: preAction.disposition === "DENY" ? "high" : preAction.disposition === "REQUIRE_APPROVAL" ? "warning" : "info",
+    metadata: { tool: call.name, disposition: preAction.disposition, risk: preAction.risk, capability: preAction.capability, reversible: preAction.reversible, reasons: preAction.reasons },
+  });
+  if (preAction.disposition === "DENY") throw new Error(`Pre-Action Monitor : action refusée (${call.name}).`);
+  // REQUIRE_APPROVAL is recorded here; the existing Policy Engine and Decision Gate remain the authority for approval.
+
   const riskLevel = definition.risk === "write-sensitive" ? "high" : definition.risk === "recommendation" ? "medium" : "low";
   const gate = await recordDecisionGate({ runId: governanceContext?.runId, stepId: governanceContext?.stepId, actionType: call.name, riskLevel, reversible: definition.risk !== "write-sensitive", authorizationPresent: Boolean(dbDecision?.allowed || policyReason === "human_approval_required"), policyId: dbDecision?.policy_id ?? dbDecision?.policyId ?? null, knowledgeIds: governanceContext?.knowledgeIds, evidenceIds: governanceContext?.evidenceIds, rationale: { policy_reason: policyReason, local_authorization: localAuthorization.allowed, knowledge_is_not_authorization: true } });
   if (gate?.outcome === "BLOCK") throw new Error(`Decision Gate : action bloquée (${call.name}).`);

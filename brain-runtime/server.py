@@ -11,6 +11,7 @@ N_CTX = int(os.environ.get("NEXORA_N_CTX", "8192"))
 N_THREADS = int(os.environ.get("NEXORA_N_THREADS", str(max(1, os.cpu_count() or 4))))
 N_GPU_LAYERS = int(os.environ.get("NEXORA_N_GPU_LAYERS", "0"))
 API_KEY = os.environ.get("NEXORA_BRAIN_API_KEY", "")
+REQUIRE_AUTH = os.environ.get("NEXORA_BRAIN_REQUIRE_AUTH", "true").strip().lower() not in {"0", "false", "no"}
 
 app = FastAPI(title="NEXORA Brain", version="0.1.0")
 
@@ -38,6 +39,8 @@ class ChatRequest(BaseModel):
 
 
 def authorize(authorization: str | None) -> None:
+    if REQUIRE_AUTH and not API_KEY:
+        raise HTTPException(status_code=503, detail="NEXORA Brain authentication is not configured")
     if not API_KEY:
         return
     expected = f"Bearer {API_KEY}"
@@ -46,7 +49,9 @@ def authorize(authorization: str | None) -> None:
 
 
 def health_payload() -> dict[str, Any]:
-    return {"status": "ok", "model": MODEL_NAME}
+    if REQUIRE_AUTH and not API_KEY:
+        return {"status": "degraded", "model": MODEL_NAME, "auth_configured": False}
+    return {"status": "ok", "model": MODEL_NAME, "auth_configured": True}
 
 
 def generate(request: ChatRequest, authorization: str | None) -> dict[str, Any]:

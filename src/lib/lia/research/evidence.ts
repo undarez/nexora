@@ -27,6 +27,15 @@ const tierWeight: Record<SourceTier, number> = { official:100, authority:95, sta
 const norm = (s:string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g," ").trim();
 const similarity = (a:string,b:string) => { const A=new Set(norm(a).split(/\s+/).filter(x=>x.length>2)), B=new Set(norm(b).split(/\s+/).filter(x=>x.length>2)); if(!A.size||!B.size)return 0; let n=0; for(const w of A)if(B.has(w))n++; return n/(A.size+B.size-n); };
 const stale = (e:ResearchEvidence, now:Date) => { if(!e.source.publishedAt)return false; const t=Date.parse(e.source.publishedAt); return Number.isFinite(t) && now.getTime()-t > 1000*60*60*24*365*3; };
+const sourceIndependenceKey = (e:ResearchEvidence) => {
+  const publisher = norm(e.source.publisher ?? "");
+  try {
+    const host = e.source.url ? new URL(e.source.url).hostname.toLowerCase().replace(/^www\\./, "") : "";
+    return publisher || host || e.source.url || e.id;
+  } catch {
+    return publisher || e.source.url || e.id;
+  }
+};
 
 /** Deterministic evidence adjudication. It evaluates supplied evidence; it does not browse or invent sources. */
 export function evaluateResearch(query:string, evidence:ResearchEvidence[], now=new Date()):ResearchResult {
@@ -41,7 +50,9 @@ export function evaluateResearch(query:string, evidence:ResearchEvidence[], now=
     const strongPos=positive.filter(e=>tierWeight[e.source.tier]>=80);
     const strongNeg=negative.filter(e=>tierWeight[e.source.tier]>=80);
     if(strongPos.length&&strongNeg.length){ contradictions.push({evidenceIds:[...strongPos,...strongNeg].map(e=>e.id),reason:"Des sources suffisamment fortes soutiennent des positions opposées; arbitrage requis."}); return {claim:g.claim,state:"contradicted" as const,confidence:Math.round(Math.max(...g.items.map(e=>e.confidence ?? 0))),evidenceIds:g.items.map(e=>e.id)}; }
-    const corroborated=strongPos.length>=2 || (strongPos.length>=1 && positive.length>=2);
+    const distinctStrongPositiveSources = new Set(strongPos.map(sourceIndependenceKey)).size;
+    const distinctPositiveSources = new Set(positive.map(sourceIndependenceKey)).size;
+    const corroborated = distinctStrongPositiveSources >= 2 || (distinctStrongPositiveSources >= 1 && distinctPositiveSources >= 2);
     const conf=Math.min(100,Math.round(Math.max(...positive.map(e=>e.confidence ?? 0),0) + (corroborated?10:0)));
     return {claim:g.claim,state:corroborated?"verified" as const:(positive.length?"supported" as const:"uncertain" as const),confidence:conf,evidenceIds:g.items.map(e=>e.id)};
   });

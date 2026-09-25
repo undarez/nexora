@@ -32,6 +32,7 @@ export function buildLiaProductionReadiness(): {
     envCheck('supabase-public', 'Supabase public key', ['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']),
     envCheck('supabase-service', 'Supabase service role', ['SUPABASE_SERVICE_ROLE_KEY']),
     envCheck('admin-emails', 'Admin control plane', ['ADMIN_EMAILS']),
+    envCheck('brain-auth', 'NEXORA Brain authentication', ['NEXORA_BRAIN_API_KEY'], false),
     envCheck('powens', 'Open Banking provider', ['POWENS_CLIENT_ID', 'POWENS_API_KEY'], false),
     envCheck('resend', 'Transactional email', ['RESEND_API_KEY'], false),
   ];

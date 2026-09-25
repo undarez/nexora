@@ -153,6 +153,8 @@ export function deterministicLiaAnalysis(question: string, context: Context, tas
   const asksGoal = /objectif|épargne|économi|projet/.test(q) || task === "wealth";
   const asksForecast = /prévision|projection|avenir|prochain mois|prochains mois|futur/.test(q);
   const asksAnomaly = /anomal|inhabitu|dérive|excess|trop dépens/.test(q);
+  const asksSpendingDistribution = /(où|ou)\s+(part|va)\s+(mon|mes|l['’]?)?\s*(argent|dépenses?|revenus?)/.test(q)
+    || /dans quoi.*(dépense|argent)|répartition.*(dépense|argent)|ou.*je.*dépense|je dépense où/.test(q);
 
   if (asksBudget) {
     lines.push(`**Budget de ${monthLabel(budget.month)}**`);
@@ -184,7 +186,22 @@ export function deterministicLiaAnalysis(question: string, context: Context, tas
     }
   }
 
-  if (asksTransactions && !asksBudget && !asksBalance) {
+  if (asksSpendingDistribution) {
+    lines.push("**Où part ton argent ?**");
+    if (top.length) {
+      const total = top.reduce((sum, [, value]) => sum + value, 0);
+      lines.push(`Sur la période analysée, les dépenses se concentrent surtout sur **${money(total)}** répartis entre ces principaux postes :`);
+      top.slice(0, 4).forEach(([name, value]) => {
+        const share = expenses90 > 0 ? value / expenses90 * 100 : 0;
+        lines.push(`- **${name}** : ${money(value)} (${pct(share)} des dépenses observées).`);
+      });
+      lines.push("Si tu veux, je peux ensuite te montrer **ce qui pèse le plus**, puis regarder avec toi où il y a réellement de la marge sans te priver inutilement.");
+    } else {
+      lines.push("Je n’ai pas encore assez de dépenses catégorisées pour te donner une répartition fiable. Je peux quand même regarder le détail des transactions disponibles.");
+    }
+  }
+
+  if (asksTransactions && !asksBudget && !asksBalance && !asksSpendingDistribution) {
     lines.push(`**Activité récente : ${transactions.length} transaction(s) observée(s) sur la fenêtre analysée.**`);
     lines.push(`- Revenus 90 jours : **${money(income90)}**`);
     lines.push(`- Dépenses 90 jours : **${money(expenses90)}**`);
@@ -241,7 +258,8 @@ export function deterministicLiaAnalysis(question: string, context: Context, tas
     lines.push("Je distingue ces informations externes des faits financiers enregistrés et je ne les utilise pas comme données personnelles.");
   }
 
-  if (relational && initiativeLevel >= 2 && detailLevel !== "concise") {
+  const simpleFinancialQuestion = asksSpendingDistribution && !/analyse|complet|situation|budget/.test(q);
+  if (relational && initiativeLevel >= 2 && detailLevel !== "concise" && !simpleFinancialQuestion) {
     lines.push("");
     lines.push("**Accompagnement proposé**");
     lines.push(initiativeLevel >= 3
@@ -249,8 +267,10 @@ export function deterministicLiaAnalysis(question: string, context: Context, tas
       : "- Je te signale les prochaines vérifications utiles lorsque les données le justifient.");
   }
 
-  lines.push("");
-  lines.push("**Prochaine vérification** : contrôler les nouvelles transactions, l'état des enveloppes et la projection du mois avant toute décision financière.");
+  if (!simpleFinancialQuestion) {
+    lines.push("");
+    lines.push("**Prochaine vérification** : contrôler les nouvelles transactions, l'état des enveloppes et la projection du mois avant toute décision financière.");
+  }
 
   const confidence = accounts.length || transactions.length || budget.envelopes.length ? 92 : 72;
   return { content: lines.join("\n"), model: "lia-cognitive-core", provider: "deterministic", confidence, capabilities };
