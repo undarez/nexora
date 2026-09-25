@@ -98,7 +98,7 @@ export async function refreshSkillCanaryHealth(admin: SupabaseClient, candidateI
   await admin.from("lia_skill_release_events").insert({
     user_id: candidate.user_id,
     candidate_id: candidate.id,
-    action: "review_started",
+    action: "canary_health_checked",
     actor_type: "system",
     reason: healthy ? "Canary health gate passed." : "Canary health gate not yet satisfied.",
     evidence: gates,
