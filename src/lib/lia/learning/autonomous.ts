@@ -147,7 +147,31 @@ export async function runAutonomousLearningCycle(admin: SupabaseClient, userId: 
     }
 
     const research = evaluateResearch(topic.query, evidence);
-    const nodes = evidence.map(e => ({ id: e.id, topic: topic.id, claim: e.claim, state: e.state === "stale" ? "uncertain" as const : "uncertain" as const, confidence: e.confidence ?? 0, source: { kind: "research", id: e.id, url: e.source.url ?? null, publishedAt: e.source.publishedAt ?? null }, observedAt: e.source.observedAt ?? startedAt }));
+    const claimByEvidenceId = new Map<string, (typeof research.claims)[number]>();
+    for (const claim of research.claims) {
+      for (const evidenceId of claim.evidenceIds) claimByEvidenceId.set(evidenceId, claim);
+    }
+    const nodes = evidence.map(e => {
+      const claim = claimByEvidenceId.get(e.id);
+      const state = e.state === "stale"
+        ? "stale" as const
+        : claim?.state === "verified"
+          ? "verified" as const
+          : claim?.state === "contradicted"
+            ? "contradicted" as const
+            : claim?.state === "supported"
+              ? "known" as const
+              : "uncertain" as const;
+      return {
+        id: e.id,
+        topic: topic.id,
+        claim: e.claim,
+        state,
+        confidence: e.confidence ?? 0,
+        source: { kind: "research", id: e.id, url: e.source.url ?? null, publishedAt: e.source.publishedAt ?? null },
+        observedAt: e.source.observedAt ?? startedAt,
+      };
+    });
     const graph = buildKnowledgeGraph(nodes);
     await admin.from("lia_knowledge_graph_runs").insert({ user_id: userId, nodes: graph.nodes, edges: graph.edges, contradictions: graph.contradictions, stale_candidates: graph.staleCandidates, provenance_required: true, activation_allowed: false });
 
