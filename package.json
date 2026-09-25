@@ -109,7 +109,8 @@
     "lia:chapter7-p3-supervisor": "node scripts/lia-chapter7-p2-autonomous-supervisor-regression.mjs",
     "lia:chapter7-p3-1-supervisor": "node scripts/lia-chapter7-p3-1-supervisor-regression.mjs",
     "lia:chapter7-p4-continuous": "node scripts/lia-chapter7-p4-continuous-operations-regression.mjs",
-    "lia:chapter7-p4-verification": "node scripts/lia-chapter7-p4-verification-regression.mjs"
+    "lia:chapter7-p4-verification": "node scripts/lia-chapter7-p4-verification-regression.mjs",
+    "lia:audit-p0": "node --experimental-strip-types scripts/lia-audit-p0-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",
