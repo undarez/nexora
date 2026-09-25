@@ -64,7 +64,13 @@ Le README principal reste volontairement à la racine comme porte d’entrée du
 
 Les README appartenant réellement à un module autonome restent dans leur dossier afin de préserver leur contexte local.
 
-## 7. Critères de validation
+## 7. Vérification automatique du réveil
+
+Une route protégée /api/lia/runtime/p4-verify est désormais planifiée à 21:00 UTC. Elle vérifie la fenêtre P4 de 20:00 UTC, confirme l’exécution du job et la présence d’un réveil dans lia_autonomous_wakes, puis écrit un événement de vérification. En cas d’absence de preuve, une notification système est créée dans NEXORA.
+
+Cette vérification ne déclenche aucune action financière et ne modifie aucune permission.
+
+## 8. Critères de validation
 
 - conversation regression : obligatoire
 - détection des sorties internes : obligatoire
@@ -76,7 +82,7 @@ Les README appartenant réellement à un module autonome restent dans leur dossi
 - aucune modification de permission financière
 - aucun retrait de garde-fou
 
-## 8. Verdict
+## 9. Verdict
 
 P4 : prêt pour preuve E2E, mais pas encore déclaré prouvé.
 
