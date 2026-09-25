@@ -32,6 +32,35 @@ export function deterministicConversationReply(intent: Exclude<LiaConversationIn
   }
 }
 
+export function isLikelyInternalLiaOutput(response: string): boolean {
+  const text = response.trim();
+  if (!text) return true;
+  const markers = [
+    "NEXORA REASONING KERNEL",
+    "NEXORA DECISION & PLANNING KERNEL",
+    "NEXORA BUDGET & SCENARIO KERNEL",
+    "NEXORA DECISION & RECOMMENDATION ENGINE",
+    "NEXORA CRITIQUE KERNEL",
+    "NEXORA UNIFIED COGNITIVE LOOP",
+    "NEXORA DECISION KERNEL",
+    "RÈGLES D’INTERACTION LIA",
+    "financial_data_gateway",
+    "Question reçue :",
+    "RÉSULTATS DES OUTILS DÉTERMINISTES",
+    "PASSERELLE DE DONNÉES FINANCIÈRES",
+  ];
+  const markerCount = markers.reduce((count, marker) => count + (text.includes(marker) ? 1 : 0), 0);
+  const jsonDensity = ((text.match(/[{}\[\]]/g) ?? []).length / Math.max(1, text.length)) > 0.015;
+  return markerCount >= 2 || jsonDensity || text.length > 14000;
+}
+
+export function selectHumanLiaResponse(generated: string, safeFallback: string): { content: string; rejectedGenerated: boolean } {
+  if (isLikelyInternalLiaOutput(generated)) {
+    return { content: safeFallback, rejectedGenerated: true };
+  }
+  return { content: generated.trim(), rejectedGenerated: false };
+}
+
 export const LIA_CONVERSATION_SYSTEM_PROMPT = `Tu es LIA, l'assistante de NEXORA. Tu dois être naturelle, chaleureuse et interactive, pas mécanique.
 
 COMPORTEMENT CONVERSATIONNEL :
