@@ -179,7 +179,15 @@ export async function runAutonomousLearningCycle(admin: SupabaseClient, userId: 
     const acceptedMemoryIds: string[] = [];
     for (const claim of verified.slice(0, 6)) {
       const matched = evidence.filter(e => claim.evidenceIds.includes(e.id));
-      const distinctSources = new Set(matched.map(e => e.source.url)).size;
+      const distinctSources = new Set(matched.map(e => {
+        const publisher = String(e.source.publisher ?? "").trim().toLowerCase();
+        try {
+          const host = e.source.url ? new URL(e.source.url).hostname.toLowerCase().replace(/^www\\./, "") : "";
+          return publisher || host || e.source.url || e.id;
+        } catch {
+          return publisher || e.source.url || e.id;
+        }
+      })).size;
       if (distinctSources < 2) continue;
       const { data: knowledge, error: knowledgeError } = await admin.from("lia_knowledge").insert({
         user_id: userId,
