@@ -50,7 +50,7 @@ export async function executeAgentTool(
   await recordFinancialBehaviourEvent({
     runId: governanceContext?.runId,
     stepId: governanceContext?.stepId,
-    eventType: "pre_action_assessment",
+    eventType: "tool_call",
     severity: preAction.disposition === "DENY" ? "high" : preAction.disposition === "REQUIRE_APPROVAL" ? "warning" : "info",
     metadata: { tool: call.name, disposition: preAction.disposition, risk: preAction.risk, capability: preAction.capability, reversible: preAction.reversible, reasons: preAction.reasons },
   });
