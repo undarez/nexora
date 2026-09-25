@@ -53,6 +53,8 @@ jobs:
         run: npm run lia:chapter7-p4-continuous
       - name: Audit P0 regression
         run: npm run lia:audit-p0
+      - name: Self-improvement runtime regression
+        run: npm run lia:self-improvement-runtime
 
       - name: Orchestration regression
         run: npm run lia:orchestration
