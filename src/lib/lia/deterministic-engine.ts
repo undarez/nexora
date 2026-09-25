@@ -192,7 +192,7 @@ export function deterministicLiaAnalysis(question: string, context: Context, tas
       const total = top.reduce((sum, [, value]) => sum + value, 0);
       lines.push(`Sur la période analysée, les dépenses se concentrent surtout sur **${money(total)}** répartis entre ces principaux postes :`);
       top.slice(0, 4).forEach(([name, value]) => {
-        const share = expense90 > 0 ? value / expense90 * 100 : 0;
+        const share = expenses90 > 0 ? value / expenses90 * 100 : 0;
         lines.push(`- **${name}** : ${money(value)} (${pct(share)} des dépenses observées).`);
       });
       lines.push("Si tu veux, je peux ensuite te montrer **ce qui pèse le plus**, puis regarder avec toi où il y a réellement de la marge sans te priver inutilement.");
