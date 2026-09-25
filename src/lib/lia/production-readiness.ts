@@ -33,6 +33,7 @@ export function buildLiaProductionReadiness(): {
     envCheck('supabase-service', 'Supabase service role', ['SUPABASE_SERVICE_ROLE_KEY']),
     envCheck('admin-emails', 'Admin control plane', ['ADMIN_EMAILS']),
     envCheck('brain-auth', 'NEXORA Brain authentication', ['NEXORA_BRAIN_API_KEY'], false),
+    envCheck('skill-sandbox', 'Skill sandbox gateway', ['LIA_SKILL_SANDBOX_URL', 'LIA_SKILL_SANDBOX_SECRET'], false),
     envCheck('powens', 'Open Banking provider', ['POWENS_CLIENT_ID', 'POWENS_API_KEY'], false),
     envCheck('resend', 'Transactional email', ['RESEND_API_KEY'], false),
   ];
