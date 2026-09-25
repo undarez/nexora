@@ -269,7 +269,7 @@ export function deterministicLiaAnalysis(question: string, context: Context, tas
 
   if (!simpleFinancialQuestion) {
     lines.push("");
-    lines.push("**Prochaine vérification** : contrôler les nouvelles transactions, l'état des enveloppes et la projection du mois avant toute décision financière.
+    lines.push("**Prochaine vérification** : contrôler les nouvelles transactions, l'état des enveloppes et la projection du mois avant toute décision financière.");
   }
 
   const confidence = accounts.length || transactions.length || budget.envelopes.length ? 92 : 72;
