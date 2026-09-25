@@ -58,5 +58,18 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ error: "POST requis." }, { status: 405 });
+  const supabase = await createClient();
+  if (!supabase) return NextResponse.json({ error: "Supabase non configuré." }, { status: 503 });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
+
+  const { data, error } = await supabase
+    .from("lia_skill_release_candidates")
+    .select("id,skill_id,baseline_version_id,candidate_version_id,status,baseline_score,candidate_score,score_delta,regressions,gates,canary_started_at,canary_ends_at,released_at,rolled_back_at,created_at,updated_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ candidates: data ?? [] });
 }
