@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type KnowledgeState = "known" | "unknown" | "uncertain" | "assumed" | "verified" | "contradicted";
+export type KnowledgeState = "known" | "unknown" | "uncertain" | "assumed" | "verified" | "contradicted" | "stale";
 export type KnowledgeNode = {
   id: string;
   topic: string;
