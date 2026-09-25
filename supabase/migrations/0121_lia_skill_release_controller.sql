@@ -40,7 +40,7 @@ create table if not exists public.lia_skill_release_events (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   candidate_id uuid not null references public.lia_skill_release_candidates(id) on delete cascade,
-  action text not null check (action in ('created','review_started','canary_started','released','rolled_back','rejected')),
+  action text not null check (action in ('created','review_started','canary_started','canary_health_checked','released','rolled_back','rejected')),
   actor_type text not null check (actor_type in ('system','human')),
   actor_user_id uuid references auth.users(id) on delete set null,
   reason text,
