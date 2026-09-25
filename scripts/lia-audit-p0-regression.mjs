@@ -10,7 +10,7 @@ assert.match(route, /critique\.status !== "blocked"/, "brain outcome must includ
 assert.match(route, /evaluation_verdict: selfEvaluation\.evaluation\.verdict/, "brain outcome must persist evaluation signal");
 assert.match(route, /new AgentHarness\(\{ maxSteps: 8, maxToolCalls: 8, maxWallTimeMs: 120_000/, "chat tools must run under the bounded harness");
 assert.match(route, /harness: toolExecution\.harness/, "chat harness trace must be observable");
-assert.match(route, /state: "verified" as const/, "research claim state must be propagated");
+assert.match(route, /\?\.state === "verified"/, "research claim state must be propagated");
 assert.match(autonomous, /claimByEvidenceId/, "autonomous learning must map evidence to adjudicated claims");
 assert.match(autonomous, /publisher.*hostname/, "autonomous corroboration must use independent source identity");
 
