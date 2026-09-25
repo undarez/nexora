@@ -72,6 +72,7 @@ Régressions LIA importantes :
 ```bash
 npm run lia:chapter7-final
 npm run lia:chapter7-p4-continuous
+npm run lia:chapter7-p4-verification
 npm run lia:conversation
 ```
 
