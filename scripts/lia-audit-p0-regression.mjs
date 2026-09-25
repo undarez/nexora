@@ -19,6 +19,7 @@ assert.match(brain, /if REQUIRE_AUTH and not API_KEY:/, "Brain must fail closed 
 assert.match(brain, /status.*degraded.*auth_configured/, "Brain health must expose missing auth without exposing secrets");
 
 const { evaluateResearch } = await import("../src/lib/lia/research/evidence.ts");
+const { assessPreAction } = await import("../src/lib/lia/pre-action-monitor.ts");
 const result = evaluateResearch("test", [
   { id: "a", claim: "same claim", source: { tier: "official", url: "https://example.com/a", publisher: "Example" } },
   { id: "b", claim: "same claim", source: { tier: "official", url: "https://example.com/b", publisher: "Example" } },
@@ -30,5 +31,9 @@ const result2 = evaluateResearch("test", [
   { id: "b", claim: "same claim", source: { tier: "official", url: "https://example.org/b", publisher: "Example B" } },
 ]);
 assert.equal(result2.claims[0].state, "verified", "independent strong sources should corroborate a claim");
+
+assert.equal(assessPreAction({ tool: "get_cashflow", description: "Lire les flux", risk: "read", requiresUserApproval: false, deterministic: true }).disposition, "ALLOW");
+assert.equal(assessPreAction({ tool: "create_recommendation", description: "Créer une proposition", risk: "recommendation", requiresUserApproval: true, deterministic: true }).disposition, "REQUIRE_APPROVAL");
+assert.equal(assessPreAction({ tool: "unknown_write", description: "Modifier une donnée", risk: "write-sensitive", requiresUserApproval: true, deterministic: true }).disposition, "REQUIRE_APPROVAL");
 
 console.log("PASS audit P0: truthful research/evaluation, bounded chat harness, Brain fail-closed, independent evidence gate");
