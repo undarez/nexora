@@ -25,8 +25,8 @@ const POLICIES: Record<string, { minAutonomy: number; approval: boolean; risk: s
   search_skills: { minAutonomy: 0, approval: false, risk: "read" },
   search_use_cases: { minAutonomy: 0, approval: false, risk: "read" },
   research_web: { minAutonomy: 0, approval: false, risk: "read" },
-  learn_use_case: { minAutonomy: 1, approval: false, risk: "recommendation" },
-  learn_skill: { minAutonomy: 1, approval: false, risk: "recommendation" },
+  learn_use_case: { minAutonomy: 7, approval: false, risk: "recommendation" },
+  learn_skill: { minAutonomy: 7, approval: false, risk: "recommendation" },
   save_financial_insight: { minAutonomy: 3, approval: false, risk: "recommendation" },
   create_recommendation: { minAutonomy: 1, approval: false, risk: "recommendation" },
 };
