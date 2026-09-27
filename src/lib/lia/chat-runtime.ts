@@ -2,7 +2,7 @@ import { executeAgentTool } from "@/lib/agent-runtime/executor";
 import { AgentHarness } from "@/lib/lia/agent-harness";
 import type { createClient } from "@/lib/supabase/server";
 
-async function executeChatToolsWithHarness(
+export async function executeChatToolsWithHarness(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   toolNames: readonly string[],
