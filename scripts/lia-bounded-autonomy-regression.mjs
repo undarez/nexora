@@ -31,7 +31,7 @@ const checks = [
   ["service-side autonomy reads are explicitly scoped", autonomyServiceMigration.includes("auth.role() <> \'service_role\'") && autonomyServiceMigration.includes("grant execute on function public.get_lia_autonomy(uuid) to authenticated,service_role")],
   ["human approval remains a hard block", engine.includes("human_approval_required")],
   ["runner reads configured autonomy", runner.includes('rpc("get_lia_autonomy"')],
-  ["runner uses bounded capability mapping", runner.includes("autonomousToolSet(AGENT_TOOLS, autonomyData)"),
+  ["runner uses bounded capability mapping", runner.includes("autonomousToolSet(AGENT_TOOLS, autonomyData)")],
   ["runner records autonomy profile", runner.includes("describeAutonomy(autonomy.level)")],
   ["server Policy Engine remains authoritative", executor.includes('rpc("authorize_lia_tool"')],
   ["canary auto-rollback is service-role only", canaryRollbackMigration.includes("auth.role() <> 'service_role'") && canaryRollbackMigration.includes("grant execute on function public.lia_skill_canary_auto_rollback(uuid,text) to service_role")],
