@@ -44,12 +44,21 @@ begin
   end if;
 
   if c.baseline_version_id is not null then
+    -- Keep the activation ledger consistent with lia_skills.active_version_id:
+    -- close the candidate activation first, then create the baseline activation.
     update public.lia_skill_activations
       set status='rolled_back',
           rolled_back_by=null,
           rolled_back_at=now(),
           rollback_reason=reason
     where skill_id=c.skill_id and status='active';
+
+    insert into public.lia_skill_activations(
+      skill_id, version_id, previous_version_id, activated_by, activation_reason
+    ) values (
+      c.skill_id, c.baseline_version_id, c.candidate_version_id, null,
+      'Automatic canary rollback: ' || reason
+    );
 
     update public.lia_skills
       set active_version_id=c.baseline_version_id,
