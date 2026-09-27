@@ -55,6 +55,12 @@ jobs:
         run: npm run lia:audit-p0
       - name: Self-improvement runtime regression
         run: npm run lia:self-improvement-runtime
+      - name: Bounded autonomy regression
+        run: npm run lia:bounded-autonomy
+      - name: API security architecture audit
+        run: npm run security:api-architecture
+      - name: Phase 1.1 security regression
+        run: npm run security:lia-phase1-1
 
       - name: Orchestration regression
         run: npm run lia:orchestration

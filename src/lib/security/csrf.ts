@@ -1,7 +1,14 @@
 /** Lightweight same-origin check for browser-initiated state-changing requests. */
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (!origin) return;
+  // Some non-browser/server requests legitimately omit Origin. When it is
+  // absent, reject explicit cross-site browser navigation instead of silently
+  // accepting a cookie-authenticated mutation.
+  if (!origin) {
+    const fetchSite = request.headers.get("sec-fetch-site");
+    if (fetchSite === "cross-site" || fetchSite === "same-site") throw new Error("Requête cross-origin refusée.");
+    return;
+  }
   const forwardedHost = request.headers.get("x-forwarded-host");
   const host = forwardedHost || request.headers.get("host");
   if (!host) return;

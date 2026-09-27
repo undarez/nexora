@@ -95,6 +95,20 @@ export async function refreshSkillCanaryHealth(admin: SupabaseClient, candidateI
   };
 
   await admin.from("lia_skill_release_candidates").update({ gates, updated_at: new Date().toISOString() }).eq("id", candidate.id);
+
+  // Automatic rollback is fail-safe and evidence-driven: it can only run after
+  // the health evaluator has persisted real observations. The database RPC is
+  // service-role-only and re-checks the thresholds server-side.
+  let rollback: unknown = null;
+  if (!healthy && rows.length > 0) {
+    const { data: rollbackResult, error: rollbackError } = await admin.rpc("lia_skill_canary_auto_rollback", {
+      p_candidate_id: candidate.id,
+      p_reason: critical ? "automatic_canary_critical_failure" : failed > 0 ? "automatic_canary_failed_evaluation" : uses >= 3 && averageScore < Number(candidate.baseline_score ?? 0) ? "automatic_canary_below_baseline" : "automatic_canary_failure",
+    });
+    if (rollbackError) return { ok: false, healthy: false, reason: "canary_auto_rollback_failed", rollback_error: rollbackError.message, gates };
+    rollback = rollbackResult ?? null;
+  }
+
   await admin.from("lia_skill_release_events").insert({
     user_id: candidate.user_id,
     candidate_id: candidate.id,
@@ -104,5 +118,5 @@ export async function refreshSkillCanaryHealth(admin: SupabaseClient, candidateI
     evidence: gates,
   });
 
-  return { ok: true, healthy, gates };
+  return { ok: true, healthy, gates, rollback };
 }

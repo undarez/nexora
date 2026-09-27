@@ -106,12 +106,14 @@
     "lia:chapter7-p2-supervisor": "node scripts/lia-chapter7-p2-autonomous-supervisor-regression.mjs",
     "lia:chapter7-final": "node scripts/lia-chapter7-final-regression.mjs",
     "lia:mcp-connector": "node scripts/lia-mcp-connector-regression.mjs",
-    "lia:chapter7-p3-supervisor": "node scripts/lia-chapter7-p2-autonomous-supervisor-regression.mjs",
     "lia:chapter7-p3-1-supervisor": "node scripts/lia-chapter7-p3-1-supervisor-regression.mjs",
     "lia:chapter7-p4-continuous": "node scripts/lia-chapter7-p4-continuous-operations-regression.mjs",
     "lia:chapter7-p4-verification": "node scripts/lia-chapter7-p4-verification-regression.mjs",
     "lia:audit-p0": "node --experimental-strip-types scripts/lia-audit-p0-regression.mjs",
-    "lia:self-improvement-runtime": "node --experimental-strip-types scripts/lia-self-improvement-runtime-regression.mjs"
+    "lia:self-improvement-runtime": "node --experimental-strip-types scripts/lia-self-improvement-runtime-regression.mjs",
+    "lia:bounded-autonomy": "node scripts/lia-bounded-autonomy-regression.mjs",
+    "security:api-architecture": "node scripts/api-security-architecture-audit.mjs",
+    "security:lia-phase1-1": "node scripts/lia-phase1-1-security-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",

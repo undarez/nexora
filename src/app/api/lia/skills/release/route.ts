@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { assertSameOrigin } from "@/lib/security/csrf";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,10 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
 
   try {
+    const adminUser = await requireAdmin(supabase);
+    const admin = getSupabaseAdmin();
+    if (!admin) return NextResponse.json({ error: "Supabase admin non configuré." }, { status: 503 });
+
     const body = await request.json();
     const candidateId = typeof body?.candidateId === "string" ? body.candidateId : "";
     const action = typeof body?.action === "string" ? body.action : "";
@@ -27,29 +32,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "candidateId et action sont requis." }, { status: 400 });
     }
 
-    // The RPC is SECURITY DEFINER but requires auth.uid() and checks ownership.
-    const { data, error } = await supabase.rpc("lia_skill_release_transition", {
+    // Release/canary/rollback is a control-plane operation. The database RPC
+    // is service-role-only; this route supplies the authenticated admin actor.
+    const { data, error } = await admin.rpc("lia_skill_release_transition_admin", {
       p_candidate_id: candidateId,
       p_action: action,
       p_reason: reason,
+      p_actor: adminUser.id,
     });
 
     if (error) {
-      const status = /authentication_required|not_found/i.test(error.message) ? 403 : 409;
+      const status = /authentication_required|not_found|control_plane/i.test(error.message) ? 403 : 409;
       return NextResponse.json({ error: error.message }, { status });
     }
 
     // Record a server-side control-plane audit event as an additional trace.
-    const admin = getSupabaseAdmin();
-    if (admin) {
-      await admin.from("lia_runtime_events").insert({
-        user_id: user.id,
-        runtime_type: "skill_release",
-        event: `skill_release.${action}`,
-        status: "completed",
-        payload: { candidate_id: candidateId, action, result: data, human_actor: user.id },
-      });
-    }
+    await admin.from("lia_runtime_events").insert({
+      user_id: user.id,
+      runtime_type: "skill_release",
+      event: `skill_release.${action}`,
+      status: "completed",
+      payload: { candidate_id: candidateId, action, result: data, human_actor: user.id },
+    });
 
     return NextResponse.json({ ok: true, result: data });
   } catch (error) {
