@@ -9,6 +9,8 @@ const learning = readFileSync(join(root, "src/lib/lia/learning/autonomous.ts"), 
 const identity = readFileSync(join(root, "src/lib/security/agent-identity.ts"), "utf8");
 const releaseMigration = readFileSync(join(root, "supabase/migrations/0131_lia_learning_policy_alignment.sql"), "utf8");
 const autonomyServiceMigration = readFileSync(join(root, "supabase/migrations/0132_lia_autonomy_service_read.sql"), "utf8");
+const canaryRollbackMigration = readFileSync(join(root, "supabase/migrations/0133_lia_skill_canary_auto_rollback.sql"), "utf8");
+const releaseController = readFileSync(join(root, "src/lib/lia/skill-release-controller.ts"), "utf8");
 
 const checks = [
   ["bounded engine exists", engine.includes("function autonomousToolSet")],
@@ -32,6 +34,9 @@ const checks = [
   ["runner uses bounded capability mapping", runner.includes("autonomousToolSet(AGENT_TOOLS, autonomyData)"),
   ["runner records autonomy profile", runner.includes("describeAutonomy(autonomy.level)")],
   ["server Policy Engine remains authoritative", executor.includes('rpc("authorize_lia_tool"')],
+  ["canary auto-rollback is service-role only", canaryRollbackMigration.includes("auth.role() <> 'service_role'") && canaryRollbackMigration.includes("grant execute on function public.lia_skill_canary_auto_rollback(uuid,text) to service_role")],
+  ["canary rollback requires observed evidence", canaryRollbackMigration.includes("canary_observations") && canaryRollbackMigration.includes("rollback_threshold_not_reached")],
+  ["canary health runtime invokes rollback RPC", releaseController.includes('rpc("lia_skill_canary_auto_rollback"')],
   ["sensitive writes remain blocked", executor.includes('definition.risk === "write-sensitive"')],
 ];
 
