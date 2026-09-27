@@ -9,6 +9,9 @@ const executor = readFileSync(join(root, "src/lib/agent-runtime/executor.ts"), "
 const checks = [
   ["bounded engine exists", engine.includes("function autonomousToolSet")],
   ["L3 enables low-risk recommendation execution", engine.includes("level >= 3")],
+  ["L4 enables bounded chaining", engine.includes("level >= 4 ? bounded : 1")],
+  ["L7 is required for validated learning", runner.includes("autonomy.level >= 7")],
+  ["policy minimums are consulted", engine.includes("getAgentPolicy(tool.name)")],
   ["human approval remains a hard block", engine.includes("human_approval_required")],
   ["runner reads configured autonomy", runner.includes('rpc("get_lia_autonomy"')],
   ["runner uses bounded capability mapping", runner.includes("autonomousToolSet(AGENT_TOOLS, autonomyData)"),
