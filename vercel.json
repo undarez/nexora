@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/lia/runtime/cron",
-      "schedule": "0 8 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/lia/runtime/cron",
-      "schedule": "0 20 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/lia/runtime/p4-verify",
