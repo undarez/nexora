@@ -9,6 +9,7 @@ export async function executeChatToolsWithHarness(
   runId: string | null,
 ) {
   if (!supabase) throw new Error("Supabase n'est pas configuré.");
+  // Chat tool execution stays bounded and observable; it never owns financial policy decisions.
   const harness = new AgentHarness({ maxSteps: 8, maxToolCalls: 8, maxWallTimeMs: 120_000, maxRepeatedCalls: 1 });
   const results: Record<string, unknown> = {};
 
