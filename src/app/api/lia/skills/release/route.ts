@@ -47,16 +47,13 @@ export async function POST(request: Request) {
     }
 
     // Record a server-side control-plane audit event as an additional trace.
-    const admin = getSupabaseAdmin();
-    if (admin) {
-      await admin.from("lia_runtime_events").insert({
-        user_id: user.id,
-        runtime_type: "skill_release",
-        event: `skill_release.${action}`,
-        status: "completed",
-        payload: { candidate_id: candidateId, action, result: data, human_actor: user.id },
-      });
-    }
+    await admin.from("lia_runtime_events").insert({
+      user_id: user.id,
+      runtime_type: "skill_release",
+      event: `skill_release.${action}`,
+      status: "completed",
+      payload: { candidate_id: candidateId, action, result: data, human_actor: user.id },
+    });
 
     return NextResponse.json({ ok: true, result: data });
   } catch (error) {
