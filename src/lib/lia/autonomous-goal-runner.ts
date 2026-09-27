@@ -12,7 +12,7 @@ import { loadLiaMemory, rememberLiaEpisode } from "@/lib/lia/memory-core";
 import { AGENT_TOOLS } from "@/lib/agent-runtime/tool-registry";
 import { buildLiaIntelligenceBridge } from "@/lib/lia/intelligence-bridge";
 import { evaluateLiaSkills } from "@/lib/lia/learning/skill-evaluator";
-import { autonomousToolSet, describeAutonomy, maxAutonomousToolCalls } from "@/lib/lia/autonomy/bounded-engine";
+import { autonomousToolSet, describeAutonomy, maxAutonomousToolCalls, strategyForAutonomy } from "@/lib/lia/autonomy/bounded-engine";
 
 const AUTONOMOUS_TOOLS = AGENT_TOOLS.filter(tool => tool.risk === "read").map(tool => tool.name);
 export type AutonomousRunResult = { loopRunId: string; status: "completed" | "blocked" | "needs_human" | "failed"; stepsExecuted: number; observations: Array<{ tool: string; ok: boolean }>; nextAction: string; progress: number };
@@ -51,17 +51,17 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
   };
   const observations: Array<{ tool: string; ok: boolean }> = []; const detailed: Array<{ tool: string; ok: boolean; summary?: string }> = [];
   const harness = new AgentHarness({ maxSteps: effectiveToolCalls * 3 + 2, maxToolCalls: effectiveToolCalls, maxWallTimeMs: 120_000, maxRepeatedCalls: 1 });
-  const autonomyProfile = describeAutonomy(autonomy.level);
+  const autonomyProfile = { ...describeAutonomy(autonomy.level), strategy: strategyForAutonomy(autonomy.level) };
 
   let current = advanceGoalLifecycle(lifecycle, "understanding", "charger le contexte durable et identifier les inconnues", { completedStep: "durable_context_loaded" }); await persistGoalLifecycle(supabase, loopRunId, current); await persistWorkingState(supabase, loopRunId, memory, compactBrain, harness.summary(), { recalled: durableMemory.compact, count: durableMemory.recalled.length, loaded_at: durableMemory.loadedAt, autonomy: autonomyProfile, autonomous_tools: tools, blocked_tools: autonomy.blocked });
 
   for (let i = 0; i < effectiveToolCalls; i++) {
     const modelGuard = harness.guard("model", `model:${i}`); if (!modelGuard.allowed) break;
     const modelStarted = Date.now();
-    const decision = await chooseNextReasoningStepV2({ goal: run.goal, task, allowedTools: tools, memory, observations: detailed, remainingSteps: effectiveToolCalls - i, durableContext: { ...compactBrain, durable_memory: durableMemory.compact, intelligence_bridge: intelligenceBridge } });
+    const decision = await chooseNextReasoningStepV2({ goal: run.goal, task, allowedTools: tools, memory, observations: detailed, remainingSteps: effectiveToolCalls - i, strategy: autonomyProfile.strategy, durableContext: { ...compactBrain, durable_memory: durableMemory.compact, intelligence_bridge: intelligenceBridge } });
     harness.record({ kind: "model", name: "reasoning-engine-v2", ok: true, startedAt: new Date(modelStarted).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - modelStarted });
     memory.openQuestions = decision.questions; memory.checks = [...memory.checks, ...decision.checks].slice(-20);
-    await recordAgentLoopStep(supabase, loopRunId, 10 + i, { phase: "decide", agentKey: "lia:reasoning-engine-v2", input: { task, allowed_tools: tools, remaining_steps: effectiveToolCalls - i, memory, durable_context_loaded: true, durable_memory_count: durableMemory.recalled.length, intelligence_bridge: intelligenceBridge, autonomy: autonomyProfile }, output: { action: decision.action, tool: decision.tool, objective: decision.objective, questions: decision.questions, checks: decision.checks, confidence: decision.confidence }, status: "completed" });
+    await recordAgentLoopStep(supabase, loopRunId, 10 + i, { phase: "decide", agentKey: "lia:reasoning-engine-v2", input: { task, allowed_tools: tools, remaining_steps: effectiveToolCalls - i, strategy: autonomyProfile.strategy, memory, durable_context_loaded: true, durable_memory_count: durableMemory.recalled.length, intelligence_bridge: intelligenceBridge, autonomy: autonomyProfile }, output: { action: decision.action, tool: decision.tool, objective: decision.objective, questions: decision.questions, checks: decision.checks, confidence: decision.confidence }, status: "completed" });
     await persistWorkingState(supabase, loopRunId, memory, compactBrain, harness.summary(), { recalled: durableMemory.compact, count: durableMemory.recalled.length, loaded_at: durableMemory.loadedAt });
 
     if (decision.action === "needs_human") { current = advanceGoalLifecycle(current, "needs_human", decision.objective || "Une validation humaine est nécessaire.", { completedStep: "reasoning_human_gate" }); await persistGoalLifecycle(supabase, loopRunId, current); harness.complete("blocked", "validation_humaine"); return { loopRunId, status: "needs_human", stepsExecuted: observations.length, observations, nextAction: current.nextAction, progress: current.progress }; }
@@ -75,6 +75,7 @@ export async function runAutonomousGoal(supabase: SupabaseClient, userId: string
       const verification = verifyReadOnlyObservation(result, detailed); const summary = summarizeVerifiedObservation(result); const ok = verification.passed;
       observations.push({ tool, ok }); detailed.push({ tool, ok, summary }); harness.record({ kind: "tool", name: tool, ok, startedAt: new Date(started).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - started, fingerprint: `tool:${tool}` });
       memory.completedTools.push(tool); memory.facts.push(`${tool}: ${summary.slice(0, 900)}`); memory.verifiedObservations += ok ? 1 : 0; memory.checks.push(...verification.checks.map(c => `${c.key}: ${c.observed ? "ok" : "failed"}`)); if (!ok) memory.replans += 1;
+      if (!ok && autonomy.level >= 6) memory.checks.push(`strategy_replan:${autonomyProfile.strategy}`);
       await recordEvidence(supabase, loopRunId, `tool:${tool}`, "autonomous_observation", { result: typeof result === "object" ? result : { value: result }, verification }, stepId);
       await recordAgentLoopStep(supabase, loopRunId, 40 + i, { phase: "verify", agentKey: "lia:autonomous-verifier", input: { tool, checks: verification.checks }, output: { passed: ok, confidence: verification.confidence }, status: ok ? "completed" : "failed" });
     } catch (err) {
