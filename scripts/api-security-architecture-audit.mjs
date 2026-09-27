@@ -35,7 +35,7 @@ for (const file of routes) {
   const source = fs.readFileSync(file, "utf8");
   const publicRoute = publicRoutePatterns.some((pattern) => pattern.test(rel));
   const hasUserAuth = /auth\\.getUser\\(|auth\\.getSession\\(|getUser\\(|getMobileAuth\\(|requireAdmin|assertAdmin|\\bcreateClient\\()/.test(source);
-  const hasMcpBearerAuth = /requireBearerAuth\(|bearerGate/.test(source) && /verifyAccessToken|authInfo/.test(source);
+  const hasUserAuth = /auth\.getUser\(|auth\.getSession\(|getUser\(|getMobileAuth\(|requireAdmin|assertAdmin|\bcreateClient\(/.test(source);
   const hasCronSecretAuth =
     /LIA_CRON_SECRET|CRON_SECRET/.test(source) &&
     /authorization/.test(source) &&
