@@ -63,3 +63,15 @@ export function describeAutonomy(level: AutonomyLevel) {
     policyEngineRemainsAuthoritative: true,
   };
 }
+
+
+export type AutonomyStrategy = "observe" | "bounded_execution" | "complex_goal" | "adaptive_replan" | "validated_learning" | "extended_goal";
+
+export function strategyForAutonomy(level: AutonomyLevel): AutonomyStrategy {
+  if (level >= 8) return "extended_goal";
+  if (level >= 7) return "validated_learning";
+  if (level >= 6) return "adaptive_replan";
+  if (level >= 5) return "complex_goal";
+  if (level >= 3) return "bounded_execution";
+  return "observe";
+}
