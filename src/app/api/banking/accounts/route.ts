@@ -72,8 +72,10 @@ export async function DELETE(request: Request) {
     const adapter = getBankingProvider(connection.provider);
     if (!adapter?.deactivateAccounts) return NextResponse.json({ error: "Désactivation des comptes non supportée par ce fournisseur." }, { status: 422 });
     await adapter.deactivateAccounts({ connectionId, userId: user.id, externalAccountIds: [String(account.external_account_id)] });
-    const now = new Date().toISOString();
-    const { error: updateError } = await supabase.from("bank_accounts").update({ status: "disabled", access_revoked_at: now, updated_at: now }).eq("id", accountId).eq("connection_id", connectionId).eq("user_id", user.id);
+    const { error: updateError } = await supabase.rpc("lia_revoke_bank_account", {
+      p_account_id: accountId,
+      p_connection_id: connectionId,
+    });
     if (updateError) throw updateError;
     return NextResponse.json({ revoked: true, accountId });
   } catch (error) {
