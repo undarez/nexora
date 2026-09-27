@@ -99,10 +99,27 @@ begin
     if c.status not in ('canary','released') then raise exception 'candidate_not_rollbackable'; end if;
 
     if c.baseline_version_id is not null then
+      update public.lia_skill_activations
+        set status='rolled_back', rolled_back_by=auth.uid(), rolled_back_at=now_at,
+            rollback_reason=coalesce(trim(p_reason),'manual rollback')
+      where skill_id=c.skill_id and status='active';
+
+      insert into public.lia_skill_activations(
+        skill_id, version_id, previous_version_id, activated_by, activation_reason
+      ) values (
+        c.skill_id, c.baseline_version_id, c.candidate_version_id, auth.uid(),
+        coalesce(trim(p_reason),'Manual rollback to governed baseline.')
+      );
+
       update public.lia_skills
         set active_version_id=c.baseline_version_id, status='active', updated_at=now_at
       where id=c.skill_id;
     else
+      update public.lia_skill_activations
+        set status='rolled_back', rolled_back_by=auth.uid(), rolled_back_at=now_at,
+            rollback_reason=coalesce(trim(p_reason),'manual rollback')
+      where skill_id=c.skill_id and status='active';
+
       update public.lia_skills
         set active_version_id=null, status='validated', updated_at=now_at
       where id=c.skill_id;
