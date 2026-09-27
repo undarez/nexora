@@ -50,12 +50,10 @@ export async function DELETE(request: Request) {
     if (["revoked", "disconnected"].includes(String(connection.status))) return NextResponse.json({ revoked: true, alreadyRevoked: true });
     const adapter = getBankingProvider(connection.provider);
     if (adapter?.disconnect) await adapter.disconnect({ userId: user.id, connectionId: id });
-    const now = new Date().toISOString();
-    const accountQuery = supabase.from("bank_accounts").update({ status: "revoked", access_revoked_at: now, updated_at: now }).eq("connection_id", id);
-    const { error: accountError } = connection.workspace_id ? await accountQuery.eq("workspace_id", connection.workspace_id) : await accountQuery.eq("user_id", user.id);
-    if (accountError) throw accountError;
-    const updateQuery = supabase.from("bank_connections").update({ status: "revoked", updated_at: now }).eq("id", id);
-    const { error } = connection.workspace_id ? await updateQuery.eq("workspace_id", connection.workspace_id) : await updateQuery.eq("user_id", user.id);
+    const { error } = await supabase.rpc("lia_revoke_bank_connection", {
+      p_connection_id: id,
+      p_workspace_id: connection.workspace_id ? String(connection.workspace_id) : null,
+    });
     if (error) throw error;
     return NextResponse.json({ revoked: true });
   } catch (error) {
