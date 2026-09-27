@@ -106,24 +106,39 @@ export async function syncBankConnection({
 
     let data: { id: string; external_account_id: string };
     if (existingId) {
+      const { data: existingRow, error: existingRowError } = await supabase
+        .from("bank_accounts")
+        .select("id,connection_id,external_account_id")
+        .eq("id", existingId)
+        .eq("user_id", userId)
+        .single();
+      if (existingRowError || !existingRow) {
+        throw existingRowError ?? new Error("Impossible de relire le compte bancaire logique existant.");
+      }
+
+      // The logical account is shared across reconnects, but the provider
+      // external account identifier belongs to a specific provider connection.
+      // Only refresh it when the current sync owns the same NEXORA connection.
+      // A simultaneous connection to the same institution must not make two
+      // connections alternate the external identifier stored on one logical row.
+      const updatePatch: Record<string, unknown> = {
+        name: account.name,
+        account_type: account.accountType,
+        iban_masked: account.ibanMasked ?? null,
+        currency: account.currency,
+        balance: Number.isFinite(account.balance ?? NaN) ? account.balance : null,
+        available_balance: Number.isFinite(account.availableBalance ?? NaN) ? account.availableBalance : null,
+        last_synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: "active",
+      };
+      if (String(existingRow.connection_id) === connectionId) {
+        updatePatch.external_account_id = account.externalAccountId;
+      }
+
       const { data: updated, error: updateError } = await supabase
         .from("bank_accounts")
-        .update({
-          name: account.name,
-          account_type: account.accountType,
-          iban_masked: account.ibanMasked ?? null,
-          currency: account.currency,
-          external_account_id: account.externalAccountId,
-          // A logical account keeps its internal identity, while the provider's
-          // external account identifier is refreshed after reconnection.
-          // The internal connection remains authoritative for this row because
-          // reconnect flows reuse the same NEXORA connection record.
-          balance: Number.isFinite(account.balance ?? NaN) ? account.balance : null,
-          available_balance: Number.isFinite(account.availableBalance ?? NaN) ? account.availableBalance : null,
-          last_synced_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          status: "active",
-        })
+        .update(updatePatch)
         .eq("id", existingId)
         .eq("user_id", userId)
         .select("id,external_account_id")
