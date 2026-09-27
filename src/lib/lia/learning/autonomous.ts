@@ -74,6 +74,11 @@ function chooseTopic(recent: Array<{ topic?: string | null }>): LearningTopic {
 }
 
 export async function runAutonomousLearningCycle(admin: SupabaseClient, userId: string) {
+  const { data: autonomyData, error: autonomyError } = await admin.rpc("get_lia_autonomy", { p_user_id: userId });
+  if (autonomyError) throw new Error(`Autonomie LIA indisponible : ${autonomyError.message}`);
+  const rawLevel = typeof autonomyData === "number" ? autonomyData : (autonomyData && typeof autonomyData === "object" && "max_autonomy" in autonomyData ? (autonomyData as Record<string, unknown>).max_autonomy : 1);
+  const autonomyLevel = Math.max(0, Math.min(8, Math.floor(Number(rawLevel) || 0)));
+  if (autonomyLevel < 7) return { status: "blocked", reason: "validated_learning_requires_L7", autonomy_level: autonomyLevel };
   const startedAt = new Date().toISOString();
   const { data: recent } = await admin
     .from("lia_autonomous_learning_cycles")
