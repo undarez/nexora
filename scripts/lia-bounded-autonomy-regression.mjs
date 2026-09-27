@@ -8,6 +8,7 @@ const executor = readFileSync(join(root, "src/lib/agent-runtime/executor.ts"), "
 const learning = readFileSync(join(root, "src/lib/lia/learning/autonomous.ts"), "utf8");
 const identity = readFileSync(join(root, "src/lib/security/agent-identity.ts"), "utf8");
 const releaseMigration = readFileSync(join(root, "supabase/migrations/0131_lia_learning_policy_alignment.sql"), "utf8");
+const autonomyServiceMigration = readFileSync(join(root, "supabase/migrations/0132_lia_autonomy_service_read.sql"), "utf8");
 
 const checks = [
   ["bounded engine exists", engine.includes("function autonomousToolSet")],
@@ -25,6 +26,7 @@ const checks = [
   ["database learning policy is aligned to L7", releaseMigration.includes("set min_autonomy_level = 7") && releaseMigration.includes("learn_use_case") && releaseMigration.includes("learn_skill")],
   ["skill release requires promoted exact version", releaseMigration.includes("b.status='promoted'") && releaseMigration.includes("b.skill_version_id=c.candidate_version_id")],
   ["skill release rechecks memory gate", releaseMigration.includes("memory_gate_failed") && releaseMigration.includes("v.memory_gate")],
+  ["service-side autonomy reads are explicitly scoped", autonomyServiceMigration.includes("auth.role() <> \'service_role\'") && autonomyServiceMigration.includes("grant execute on function public.get_lia_autonomy(uuid) to authenticated,service_role")],
   ["human approval remains a hard block", engine.includes("human_approval_required")],
   ["runner reads configured autonomy", runner.includes('rpc("get_lia_autonomy"')],
   ["runner uses bounded capability mapping", runner.includes("autonomousToolSet(AGENT_TOOLS, autonomyData)"),
