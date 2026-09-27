@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { liaChat } from "@/lib/lia/provider";
 import { deterministicLiaAnalysis } from "@/lib/lia/deterministic-engine";
 import { AGENT_TASK_LABELS, SUPERVISOR_PROMPT, TASK_PROMPTS, type AgentTask } from "@/lib/agents/prompts";
 import { runFinancialOrchestration } from "@/lib/agents/orchestrator";
@@ -28,7 +27,6 @@ import { runNexoraDecisionKernel } from "@/lib/lia/decision-kernel";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
 import { buildLiaFinancialProjection, sanitizeToolResultsForLia } from "@/lib/lia/financial-data-gateway";
 import { buildLiaPersonalFinancialModel, compactLiaPersonalFinancialModel } from "@/lib/lia/personal-financial-model";
-
 import { runFinancialReasoning, formatFinancialReasoning } from "@/lib/lia/financial-reasoning";
 import { runRiskReasoning, formatRiskReasoning } from "@/lib/lia/risk-reasoning";
 import { runBudgetReasoning, formatBudgetReasoning } from "@/lib/lia/budget-reasoning";
@@ -115,7 +113,9 @@ export async function POST(request: Request) {
         conversation: { intent: conversationIntent, financialContextUsed: false, generatedResponseRejected: safeResponse.rejectedGenerated },
       });
     } catch (error) {
-      return NextResponse.json({ analysis: "Je suis là 😊 Dis-moi ce que tu as en tête.", model: "lia-conversation-fallback", provider: "deterministic", task: "conversation", conversation: { A indisponible:", error instanceof Error ? error.message : error);
+      return NextResponse.json({ analysis: "Je suis là 😊 Dis-moi ce que tu as en tête.", model: "lia-conversation-fallback", provider: "deterministic", task: "conversation", conversation: {   const conversationResponse = await handleLiaConversation(requestedQuestion, history);
+  if (conversationResponse) return conversationResponse;
+A indisponible:", error instanceof Error ? error.message : error);
   }
   const relationalProfile = relationalContext?.relationship as {
     relationship_mode?: string;
@@ -949,7 +949,4 @@ export async function POST(request: Request) {
       sources: research.evidence.slice(0, 8).map(e => ({ title: e.source.title, url: e.source.url, tier: e.source.tier, confidence: e.confidence }))
     } : { requested: false },
   });
-}  const conversationResponse = await handleLiaConversation(requestedQuestion, history);
-  if (conversationResponse) return conversationResponse;
-
-
+}
