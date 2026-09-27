@@ -28,13 +28,18 @@ export function autonomousToolSet(
       blocked.push({ name: tool.name, reason: "human_approval_required" });
       continue;
     }
-    if (tool.risk === "recommendation" && level >= policy.minAutonomy && level >= 3) {
+    const validatedLearningTool = tool.name === "learn_use_case" || tool.name === "learn_skill";
+    if (validatedLearningTool && level >= 7 && level >= policy.minAutonomy) {
+      allowed.push(tool.name);
+      continue;
+    }
+    if (tool.risk === "recommendation" && !validatedLearningTool && level >= policy.minAutonomy && level >= 3) {
       allowed.push(tool.name);
       continue;
     }
     blocked.push({
       name: tool.name,
-      reason: tool.risk === "recommendation" ? `autonomy_level_requires_L${Math.max(3, policy.minAutonomy)}` : "non_autonomous_risk_class",
+      reason: validatedLearningTool ? "validated_learning_requires_L7" : tool.risk === "recommendation" ? `autonomy_level_requires_L${Math.max(3, policy.minAutonomy)}` : "non_autonomous_risk_class",
     });
   }
   return { level, tools: [...new Set(allowed)], blocked };
