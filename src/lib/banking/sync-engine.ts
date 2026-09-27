@@ -92,7 +92,7 @@ export async function syncBankConnection({
     if (account.ibanMasked) {
       const { data: existing, error: existingError } = await supabase
         .from("bank_accounts")
-        .select("id")
+        .select("id,connection_id")
         .eq("user_id", userId)
         .eq("provider", account.provider)
         .eq("iban_masked", account.ibanMasked)
@@ -113,6 +113,11 @@ export async function syncBankConnection({
           account_type: account.accountType,
           iban_masked: account.ibanMasked ?? null,
           currency: account.currency,
+          external_account_id: account.externalAccountId,
+          // A logical account keeps its internal identity, while the provider's
+          // external account identifier is refreshed after reconnection.
+          // The internal connection remains authoritative for this row because
+          // reconnect flows reuse the same NEXORA connection record.
           balance: Number.isFinite(account.balance ?? NaN) ? account.balance : null,
           available_balance: Number.isFinite(account.availableBalance ?? NaN) ? account.availableBalance : null,
           last_synced_at: new Date().toISOString(),
@@ -135,9 +140,12 @@ export async function syncBankConnection({
       data = inserted;
     }
 
-    // Map both identifiers so transactions from either Powens connection resolve
-    // to the same logical account row.
-    accountIds.set(String(data.external_account_id), String(data.id));
+    // The account row now carries the current provider identifier. Keep a
+    // compatibility alias for the previous identifier only for this sync pass,
+    // so historical transactions can still resolve to the same logical account.
+    if (existingId && data.external_account_id !== account.externalAccountId) {
+      accountIds.set(String(data.external_account_id), String(data.id));
+    }
     accountIds.set(String(account.externalAccountId), String(data.id));
 
     if (account.balance != null && Number.isFinite(account.balance)) {
