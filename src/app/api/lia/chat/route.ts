@@ -84,38 +84,41 @@ export async function POST(request: Request) {
     // Default task/question are valid when no JSON body is supplied.
   }
 
-  // LIA has a true conversational lane. Lightweight social interaction must not
-  // trigger financial database reads, research, planning or recommendations.
-  const conversationIntent = detectLiaConversationIntent(requestedQuestion);
-  if (conversationIntent !== "financial") {
-    const historyContext = history.length > 0
-      ? history.map((m) => ({ role: m.role, content: m.content })).slice(-8)
-      : [];
-    if (["greeting", "wellbeing", "thanks", "farewell", "identity", "small_talk"].includes(conversationIntent)) {
-      const reply = deterministicConversationReply(conversationIntent, requestedQuestion);
-      return NextResponse.json({ analysis: reply, model: "lia-conversation", provider: "deterministic", task: "conversation", conversation: { intent: conversationIntent, financialContextUsed: false } });
-    }
-    try {
-      const result = await liaChat([
-        { role: "system", content: LIA_CONVERSATION_SYSTEM_PROMPT },
-        ...historyContext,
-        { role: "user", content: requestedQuestion },
-      ]);
-      const safeResponse = selectHumanLiaResponse(
-        result.content,
-        deterministicConversationReply("small_talk", requestedQuestion),
-      );
-      return NextResponse.json({
-        analysis: safeResponse.content,
-        model: safeResponse.rejectedGenerated ? "lia-conversation-safety-fallback" : result.model,
-        provider: safeResponse.rejectedGenerated ? "deterministic" : result.provider,
-        task: "conversation",
-        conversation: { intent: conversationIntent, financialContextUsed: false, generatedResponseRejected: safeResponse.rejectedGenerated },
-      });
-    } catch (error) {
-      return NextResponse.json({ analysis: "Je suis là 😊 Dis-moi ce que tu as en tête.", model: "lia-conversation-fallback", provider: "deterministic", task: "conversation", conversation: {   const conversationResponse = await handleLiaConversation(requestedQuestion, history);
+  const conversationResponse = await handleLiaConversation(requestedQuestion, history);
   if (conversationResponse) return conversationResponse;
-A indisponible:", error instanceof Error ? error.message : error);
+
+  let loopRunId: string | null = null;
+  let goalLifecycle: LiaGoalLifecycle | null = null;
+  let cognitiveSession: LiaCognitiveSession | null = null;
+  let sessionParentLoopRunId: string | null = null;
+  let sessionTurnIndex = 1;
+  try {
+    cognitiveSession = await getOrCreateCognitiveSession(supabase, user.id, requestedSessionId);
+    sessionParentLoopRunId = cognitiveSession.activeLoopRunId;
+    sessionTurnIndex = cognitiveSession.turnCount + 1;
+    if (!requestedLoopRunId && cognitiveSession.activeLoopRunId) requestedLoopRunId = cognitiveSession.activeLoopRunId;
+    // If the UI was refreshed, restore the last turn as bounded working context.
+    if (history.length === 0 && cognitiveSession.lastUserMessage) {
+      history = ([
+        { role: "user" as const, content: cognitiveSession.lastUserMessage.slice(0, 3000) },
+        ...(cognitiveSession.lastAssistantMessage ? [{ role: "assistant" as const, content: cognitiveSession.lastAssistantMessage.slice(0, 3000) }] : []),
+      ] as Array<{ role: "user" | "assistant"; content: string }>).slice(-8);
+    }
+  } catch (error) {
+    console.warn("Session cognitive indisponible; poursuite sans session:", error instanceof Error ? error.message : error);
+  }
+  const since = new Date();
+  since.setDate(since.getDate() - 90);
+  const startedAt = Date.now();
+  const durableMemories = await retrieveLiaMemories(supabase, user.id, requestedQuestion);
+
+  let relationalContext: Record<string, unknown> | null = null;
+  try {
+    const { data, error } = await supabase.rpc("lia_get_relational_context", { p_user_id: user.id });
+    if (!error && data && typeof data === "object") relationalContext = data as Record<string, unknown>;
+    else if (error) console.warn("Contexte relationnel LIA indisponible:", error.message);
+  } catch (error) {
+    console.warn("Contexte relationnel LIA indisponible:", error instanceof Error ? error.message : error);
   }
   const relationalProfile = relationalContext?.relationship as {
     relationship_mode?: string;
