@@ -2,14 +2,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const route = readFileSync("src/app/api/lia/chat/route.ts", "utf8");
+const chatRuntime = readFileSync("src/lib/lia/chat-runtime.ts", "utf8");
 const brain = readFileSync("brain-runtime/server.py", "utf8");
 const autonomous = readFileSync("src/lib/lia/learning/autonomous.ts", "utf8");
 
 assert.match(route, /externalResearchAvailable: Boolean\(research\)/, "self-evaluation must reflect actual research execution");
 assert.match(route, /critique\.status !== "blocked"/, "brain outcome must include critique status");
 assert.match(route, /evaluation_verdict: selfEvaluation\.evaluation\.verdict/, "brain outcome must persist evaluation signal");
-assert.match(route, /new AgentHarness\(\{ maxSteps: 8, maxToolCalls: 8, maxWallTimeMs: 120_000/, "chat tools must run under the bounded harness");
+assert.match(chatRuntime, /new AgentHarness\(\{ maxSteps: 8, maxToolCalls: 8, maxWallTimeMs: 120_000/, "chat tools must run under the bounded harness");
 assert.match(route, /harness: toolExecution\.harness/, "chat harness trace must be observable");
+assert.match(route, /executeChatToolsWithHarness/, "chat route must delegate tool execution to the bounded runtime");
 assert.match(route, /\?\.state === "verified"/, "research claim state must be propagated");
 assert.match(autonomous, /claimByEvidenceId/, "autonomous learning must map evidence to adjudicated claims");
 assert.match(autonomous, /publisher = String\(e\.source\.publisher/, "autonomous corroboration must use publisher identity");
