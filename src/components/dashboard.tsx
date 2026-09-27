@@ -199,8 +199,14 @@ export function Dashboard() {
       }
 
       if (Number(payload?.failedCount ?? 0) > 0) {
+        const syncedCount = Number(payload?.syncedCount ?? 0);
+        const failedCount = Number(payload?.failedCount ?? 0);
         setBankRefreshError(
-          "Certaines connexions bancaires n'ont pas pu être synchronisées."
+          syncedCount > 0
+            ? "Certaines connexions signalent un problème de synchronisation. Les données déjà synchronisées restent affichées."
+            : failedCount > 0
+              ? "Aucune connexion bancaire n'a pu être synchronisée lors de cette tentative."
+              : null
         );
       }
 
