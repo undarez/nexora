@@ -8,6 +8,7 @@ const releaseRoute = read("src/app/api/lia/skills/release/route.ts");
 const hardening = read("supabase/migrations/20260927110000_lia_phase1_1_release_control_hardening.sql");
 const canaryRollback = read("supabase/migrations/0133_lia_skill_canary_auto_rollback.sql");
 const dashboard = read("src/components/dashboard.tsx");
+const rpcScopeHardening = read("supabase/migrations/20260927130000_lia_phase1_1_rpc_owner_scope_hardening.sql");
 
 const checks = [
   ["release route requires admin", releaseRoute.includes("requireAdmin(supabase)")],
@@ -21,6 +22,10 @@ const checks = [
   ["dashboard refreshes banking connections itself", dashboard.includes('fetch("/api/banking/connections"')],
   ["dashboard synchronizes connections through POST", dashboard.includes('fetch("/api/banking/sync"')],
   ["dashboard exposes manual refresh", dashboard.includes("Actualiser les comptes et liquidités")],
+  ["skill search is caller-scoped or service-role only", rpcScopeHardening.includes("auth.role() = 'service_role'") && rpcScopeHardening.includes("p_user_id = auth.uid()")],
+  ["use-case search is caller-scoped or service-role only", rpcScopeHardening.includes("lia_search_use_cases") && rpcScopeHardening.includes("p_user_id = auth.uid()")],
+  ["cognitive session touch is caller-scoped", rpcScopeHardening.includes("lia_touch_cognitive_session") && rpcScopeHardening.includes("p_user_id <> auth.uid()")],
+  ["owner-scoped RPC grants remain explicit", rpcScopeHardening.includes("grant execute on function public.lia_search_skills") && rpcScopeHardening.includes("grant execute on function public.lia_search_use_cases")],
 ];
 
 let failed = 0;
