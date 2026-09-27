@@ -1319,3 +1319,10 @@ body {
   .nexora-dashboard-actions button { min-height:46px; display:flex; align-items:center; justify-content:center; gap:.45rem; border:1px solid var(--nexora-ref-line); border-radius:13px; background:var(--nexora-ref-card); color:var(--nexora-ref-text); font-size:.7rem; font-weight:800; }
   .nexora-dashboard-actions button:last-of-type { grid-column:1/-1; color:#fff; border:0; background:linear-gradient(135deg,var(--nexora-brand),var(--nexora-brand-2)); }
 }
+
+/* Dashboard priority layout: keep real situation and attention side-by-side on desktop. */
+.dashboard-priority-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; align-items: stretch; }
+@media (min-width: 1024px) {
+  .dashboard-priority-grid { grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); }
+  .dashboard-priority-grid > * { min-width: 0; }
+}
