@@ -13,6 +13,7 @@ import {
   Landmark,
   PiggyBank,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Target,
@@ -219,8 +220,8 @@ export function Dashboard() {
   }, [load]);
 
   useEffect(() => {
-    void refreshBanking();
-  }, [refreshBanking]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -447,8 +448,8 @@ export function Dashboard() {
         </div>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-[1.55fr_1fr]">
-        <Card className="overflow-hidden">
+      <section className="dashboard-priority-grid">
+        <Card className="min-w-0 overflow-hidden">
           <CardContent className="p-0">
             <div className="p-5 sm:p-7">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -527,7 +528,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
               <CardTitle>Ce qui mérite ton attention</CardTitle>
@@ -697,10 +698,11 @@ export function Dashboard() {
                   size="sm"
                   onClick={() => void refreshBanking()}
                   disabled={bankRefreshBusy}
-                  aria-label="Actualiser les comptes et liquidités"
+                  aria-label="Synchroniser les comptes bancaires"
+                  title="Synchroniser les comptes bancaires"
                 >
-                  <span className={bankRefreshBusy ? "animate-spin" : ""}>↻</span>
-                  <span className="ml-1.5 hidden sm:inline">Actualiser</span>
+                  <RefreshCw className={`h-4 w-4 ${bankRefreshBusy ? "animate-spin" : ""}`} />
+                  <span className="ml-1.5">Synchroniser</span>
                 </Button>
                 <Link href="/banque" className="text-xs font-semibold text-muted-foreground">
                   Voir le détail <ChevronRight className="inline h-3.5 w-3.5" />
@@ -738,7 +740,7 @@ export function Dashboard() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {bankRefreshBusy
-                    ? "Actualisation des comptes en cours…"
+                    ? "Synchronisation des comptes en cours…"
                     : "Les comptes sont présentés comme une photographie actuelle, pas comme une projection."}
                 </p>
               </div>
