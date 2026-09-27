@@ -182,43 +182,29 @@ export function Dashboard() {
     setBankRefreshBusy(true);
     setBankRefreshError(null);
     try {
-      const connectionsResponse = await fetch("/api/banking/connections", {
+      const response = await fetch("/api/banking/sync-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
       });
-      const connectionsPayload = await connectionsResponse.json().catch(() => ({}));
-      if (!connectionsResponse.ok) {
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
         throw new Error(
-          typeof connectionsPayload?.error === "string"
-            ? connectionsPayload.error
-            : "Impossible de lire les connexions bancaires."
+          typeof payload?.error === "string"
+            ? payload.error
+            : "Impossible de synchroniser les comptes bancaires."
         );
       }
 
-      const connections = Array.isArray(connectionsPayload?.connections)
-        ? connectionsPayload.connections
-        : [];
+      if (Number(payload?.failedCount ?? 0) > 0) {
+        setBankRefreshError(
+          "Certaines connexions bancaires n'ont pas pu être synchronisées."
+        );
+      }
 
-      const activeConnections = connections.filter(
-        (connection: { status?: string }) =>
-          connection.status !== "revoked" &&
-          connection.status !== "disconnected"
-      );
-
-      // The dashboard is allowed to refresh banking data itself. It must not
-      // require the user to visit /banque before the financial read model is
-      // current. Synchronization remains user-scoped and server-authorized.
-      await Promise.allSettled(
-        activeConnections.map((connection: { id?: string }) =>
-          typeof connection.id === "string"
-            ? fetch("/api/banking/sync", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ connectionId: connection.id }),
-              })
-            : Promise.resolve()
-        )
-      );
-
+      // Re-read the same financial model used by the dashboard after the
+      // Open Banking synchronization has completed.
       await load();
     } catch (error) {
       setBankRefreshError(

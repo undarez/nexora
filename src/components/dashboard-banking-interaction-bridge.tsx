@@ -69,20 +69,12 @@ async function connectPowens() {
 
 async function syncLiveBanking() {
   try {
-    const response = await fetch("/api/banking/connections", { cache: "no-store" });
+    const response = await fetch("/api/banking/sync-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
     if (!response.ok) return;
-    const data = (await response.json()) as { connections?: Array<{ id: string; status: string }> };
-    const connections = Array.isArray(data.connections) ? data.connections : [];
-    for (const connection of connections) {
-      // Only active connections should be polled. Pending/re-auth connections
-      // must wait for the explicit banking flow instead of generating sync errors.
-      if (!connection.id || connection.status !== "active") continue;
-      await fetch("/api/banking/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connectionId: connection.id }),
-      });
-    }
     window.dispatchEvent(new CustomEvent("nexora-banking-updated"));
   } catch {
     // Live refresh is best-effort; the manual synchronization remains available.
