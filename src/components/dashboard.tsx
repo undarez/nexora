@@ -20,6 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { UnifiedFinancialContext } from "@/lib/finance/unified-financial-context";
 
@@ -75,6 +76,8 @@ export function Dashboard() {
   const [scenarioExtraExpense, setScenarioExtraExpense] = useState(0);
   const [scenarioIncomeDelta, setScenarioIncomeDelta] = useState(0);
   const [scenarioSaving, setScenarioSaving] = useState(0);
+  const [bankRefreshBusy, setBankRefreshBusy] = useState(false);
+  const [bankRefreshError, setBankRefreshError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = getSupabaseBrowserClient();
@@ -172,9 +175,66 @@ export function Dashboard() {
     }
   }, [month]);
 
-  useEffect(() => {
-    void load();
+  const refreshBanking = useCallback(async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    setBankRefreshBusy(true);
+    setBankRefreshError(null);
+    try {
+      const connectionsResponse = await fetch("/api/banking/connections", {
+        cache: "no-store",
+      });
+      const connectionsPayload = await connectionsResponse.json().catch(() => ({}));
+      if (!connectionsResponse.ok) {
+        throw new Error(
+          typeof connectionsPayload?.error === "string"
+            ? connectionsPayload.error
+            : "Impossible de lire les connexions bancaires."
+        );
+      }
+
+      const connections = Array.isArray(connectionsPayload?.connections)
+        ? connectionsPayload.connections
+        : [];
+
+      const activeConnections = connections.filter(
+        (connection: { status?: string }) =>
+          connection.status !== "revoked" &&
+          connection.status !== "disconnected"
+      );
+
+      // The dashboard is allowed to refresh banking data itself. It must not
+      // require the user to visit /banque before the financial read model is
+      // current. Synchronization remains user-scoped and server-authorized.
+      await Promise.allSettled(
+        activeConnections.map((connection: { id?: string }) =>
+          typeof connection.id === "string"
+            ? fetch("/api/banking/sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ connectionId: connection.id }),
+              })
+            : Promise.resolve()
+        )
+      );
+
+      await load();
+    } catch (error) {
+      setBankRefreshError(
+        error instanceof Error
+          ? error.message
+          : "Actualisation bancaire indisponible."
+      );
+      await load();
+    } finally {
+      setBankRefreshBusy(false);
+    }
   }, [load]);
+
+  useEffect(() => {
+    void refreshBanking();
+  }, [refreshBanking]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -638,10 +698,28 @@ export function Dashboard() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
-              <CardTitle>Comptes & liquidités</CardTitle>
-              <Link href="/banque" className="text-xs font-semibold text-muted-foreground">
-                Voir le détail <ChevronRight className="inline h-3.5 w-3.5" />
-              </Link>
+              <div>
+                <CardTitle>Comptes & liquidités</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {bankRefreshError ?? "Photographie actuelle des comptes bancaires."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void refreshBanking()}
+                  disabled={bankRefreshBusy}
+                  aria-label="Actualiser les comptes et liquidités"
+                >
+                  <span className={bankRefreshBusy ? "animate-spin" : ""}>↻</span>
+                  <span className="ml-1.5 hidden sm:inline">Actualiser</span>
+                </Button>
+                <Link href="/banque" className="text-xs font-semibold text-muted-foreground">
+                  Voir le détail <ChevronRight className="inline h-3.5 w-3.5" />
+                </Link>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -673,7 +751,9 @@ export function Dashboard() {
                   <strong>{money2(manual)} €</strong>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Les comptes sont présentés comme une photographie actuelle, pas comme une projection.
+                  {bankRefreshBusy
+                    ? "Actualisation des comptes en cours…"
+                    : "Les comptes sont présentés comme une photographie actuelle, pas comme une projection."}
                 </p>
               </div>
             </div>
