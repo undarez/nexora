@@ -376,8 +376,9 @@ export function Dashboard() {
       )
     : 0;
 
-  const dataPeriod =
-    financialContext?.cashflow.days ?? financialContext?.metadata?.period_days ?? 90;
+  const dataPeriod = financialContext?.period_start && financialContext?.period_end
+    ? `${new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(new Date(`${financialContext.period_start}T12:00:00`))} → ${new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(new Date(`${financialContext.period_end}T12:00:00`))}`
+    : "période courante";
 
   return (
     <main className="mx-auto max-w-7xl space-y-5 px-4 pb-24 pt-5 sm:px-6 sm:pb-10 sm:pt-7">
