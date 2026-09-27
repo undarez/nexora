@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { liaChat } from "@/lib/lia/provider";
 import { deterministicLiaAnalysis } from "@/lib/lia/deterministic-engine";
 import { AGENT_TASK_LABELS, SUPERVISOR_PROMPT, TASK_PROMPTS, type AgentTask } from "@/lib/agents/prompts";
 import { runFinancialOrchestration } from "@/lib/agents/orchestrator";
 import { finishAgentLoop, recordAgentLoopStep, recordEvidence, startAgentLoop } from "@/lib/agents/loop-engine";
 import { toolsForTask } from "@/lib/agent-runtime/executor";
 import { handleLiaConversation } from "@/lib/lia/chat-conversation";
+import { selectHumanLiaResponse } from "@/lib/lia/conversation";
 import { executeChatToolsWithHarness } from "@/lib/lia/chat-runtime";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { runCognitivePhase } from "@/lib/lia/cognitive-core";
