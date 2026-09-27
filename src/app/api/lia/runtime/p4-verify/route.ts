@@ -22,7 +22,6 @@ export async function POST(request: Request) {
   try {
     const supabase = admin();
     const now = new Date();
-    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 20, 0, 0));
     const jobResult = await supabase
       .from("lia_runtime_jobs")
       .select("id,user_id,name,status,next_run_at,last_run_at,last_status,last_error,failure_count,payload")
@@ -37,23 +36,28 @@ export async function POST(request: Request) {
       .from("lia_autonomous_wakes")
       .select("id,reason,operation,status,started_at,completed_at,result")
       .eq("user_id", job.user_id)
-      .gte("started_at", dayStart.toISOString())
       .order("started_at", { ascending: false })
-      .limit(5);
+      .limit(10);
 
     if (wakeResult.error) throw new Error(`p4_verification_wake_load_failed:${wakeResult.error.message}`);
 
     const latestWake = wakeResult.data?.[0] ?? null;
-    const executed = Boolean(job.last_run_at && new Date(job.last_run_at).getTime() >= dayStart.getTime());
-    const wakeConfirmed = Boolean(latestWake?.started_at && new Date(latestWake.started_at).getTime() >= dayStart.getTime());
-    const verified = executed && wakeConfirmed;
+    const lastRunAt = job.last_run_at ? new Date(job.last_run_at).getTime() : 0;
+    const latestWakeAt = latestWake?.started_at ? new Date(latestWake.started_at).getTime() : 0;
+    const wakeBelongsToCron = Boolean(lastRunAt && latestWakeAt >= lastRunAt && latestWakeAt <= lastRunAt + 30 * 60 * 1000);
+    const wakeCompleted = latestWake?.status === "completed";
+    const executed = Boolean(lastRunAt);
+    const wakeConfirmed = wakeBelongsToCron;
+    const verified = executed && wakeConfirmed && wakeCompleted;
 
     const eventPayload = {
       verified,
       executed,
       wake_confirmed: wakeConfirmed,
       checked_at: now.toISOString(),
-      scheduled_window: dayStart.toISOString(),
+      scheduled_window: job.last_run_at,
+      wake_completed: wakeCompleted,
+      wake_belongs_to_cron: wakeBelongsToCron,
       job: {
         last_run_at: job.last_run_at,
         last_status: job.last_status,
@@ -82,7 +86,7 @@ export async function POST(request: Request) {
           ? "Le cron P4 a été exécuté, mais aucun réveil LIA correspondant n’a été confirmé."
           : "Le cron P4 n’a pas encore fourni de trace d’exécution pour la fenêtre du jour.",
         action_href: "/pilotage",
-        dedupe_key: `lia-p4-verification:${dayStart.toISOString().slice(0, 10)}`,
+        dedupe_key: `lia-p4-verification:${now.toISOString().slice(0, 10)}`,
       }, { onConflict: "user_id,dedupe_key", ignoreDuplicates: true });
     }
 
@@ -92,6 +96,8 @@ export async function POST(request: Request) {
       wakeConfirmed,
       operation: latestWake?.operation ?? null,
       wakeStatus: latestWake?.status ?? null,
+      wakeBelongsToCron,
+      wakeCompleted,
       checkedAt: now.toISOString(),
     }, { status: verified ? 200 : 409 });
   } catch (error) {
