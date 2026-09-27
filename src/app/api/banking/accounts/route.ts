@@ -54,6 +54,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  try { assertSameOrigin(request); } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "Requête cross-origin refusée." }, { status: 403 }); }
   try {
     const { supabase, user } = await auth();
     const params = new URL(request.url).searchParams;
