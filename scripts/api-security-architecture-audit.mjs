@@ -35,7 +35,14 @@ for (const file of routes) {
   const source = fs.readFileSync(file, "utf8");
   const publicRoute = publicRoutePatterns.some((pattern) => pattern.test(rel));
   const hasMcpBearerAuth = /requireBearerAuth\(|bearerGate/.test(source) && /verifyAccessToken|authInfo/.test(source);
-  const hasUserAuth = !hasMcpBearerAuth && /auth\.getUser\(|auth\.getSession\(|getUser\(|getMobileAuth\(|requireAdmin|assertAdmin|\bcreateClient\(\)/.test(source);
+  const hasMcpBearerAuth = /requireBearerAuth\(|bearerGate/.test(source) && /verifyAccessToken|authInfo/.test(source);
+  const hasCronSecretAuth =
+    /LIA_CRON_SECRET|CRON_SECRET/.test(source) &&
+    /authorization/.test(source) &&
+    /Bearer/.test(source) &&
+    /function authorized/.test(source);
+  const hasUserAuth = !hasMcpBearerAuth && !hasCronSecretAuth &&
+    /auth\.getUser\(|auth\.getSession\(|getUser\(|getMobileAuth\(|requireAdmin|assertAdmin|\bcreateClient\(\)/.test(source);
   const hasAuth = hasUserAuth || hasCronSecretAuth || hasMcpBearerAuth;
   const machineToMachineMutation = (hasCronSecretAuth || hasMcpBearerAuth) && !hasUserAuth;
   const methods = [...source.matchAll(/export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/g)].map((m) => m[1]);
