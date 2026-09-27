@@ -6,6 +6,8 @@ const engine = readFileSync(join(root, "src/lib/lia/autonomy/bounded-engine.ts")
 const runner = readFileSync(join(root, "src/lib/lia/autonomous-goal-runner.ts"), "utf8");
 const executor = readFileSync(join(root, "src/lib/agent-runtime/executor.ts"), "utf8");
 const learning = readFileSync(join(root, "src/lib/lia/learning/autonomous.ts"), "utf8");
+const identity = readFileSync(join(root, "src/lib/security/agent-identity.ts"), "utf8");
+const releaseMigration = readFileSync(join(root, "supabase/migrations/0131_lia_learning_policy_alignment.sql"), "utf8");
 
 const checks = [
   ["bounded engine exists", engine.includes("function autonomousToolSet")],
@@ -19,6 +21,10 @@ const checks = [
   ["L8 has an extended-goal strategy", engine.includes('return "extended_goal"')],
   ["strategy reaches reasoning engine", runner.includes("strategy: autonomyProfile.strategy") && readFileSync(join(root, "src/lib/lia/reasoning-engine-v2.ts"), "utf8").includes("strategy?: string")],
   ["policy minimums are consulted", engine.includes("getAgentPolicy(tool.name)")],
+  ["learning policy is L7 in server identity", identity.includes("learn_use_case: { minAutonomy: 7") && identity.includes("learn_skill: { minAutonomy: 7")],
+  ["database learning policy is aligned to L7", releaseMigration.includes("set min_autonomy_level = 7") && releaseMigration.includes("learn_use_case") && releaseMigration.includes("learn_skill")],
+  ["skill release requires promoted exact version", releaseMigration.includes("b.status='promoted'") && releaseMigration.includes("b.skill_version_id=c.candidate_version_id")],
+  ["skill release rechecks memory gate", releaseMigration.includes("memory_gate_failed") && releaseMigration.includes("v.memory_gate")],
   ["human approval remains a hard block", engine.includes("human_approval_required")],
   ["runner reads configured autonomy", runner.includes('rpc("get_lia_autonomy"')],
   ["runner uses bounded capability mapping", runner.includes("autonomousToolSet(AGENT_TOOLS, autonomyData)"),
