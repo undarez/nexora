@@ -61,6 +61,8 @@ jobs:
         run: npm run security:api-architecture
       - name: Phase 1.1 security regression
         run: npm run security:lia-phase1-1
+      - name: Financial notification unified-ledger regression
+        run: npm run financial:notifications
 
       - name: Orchestration regression
         run: npm run lia:orchestration
