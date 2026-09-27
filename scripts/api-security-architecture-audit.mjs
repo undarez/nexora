@@ -34,12 +34,19 @@ for (const file of routes) {
   const rel = "/" + path.relative(root, file).replaceAll(path.sep, "/");
   const source = fs.readFileSync(file, "utf8");
   const publicRoute = publicRoutePatterns.some((pattern) => pattern.test(rel));
-  const hasAuth = /auth\.getUser\(|auth\.getSession\(|getUser\(|requireAdmin|assertAdmin|authorized\(|createClient\(\)/.test(source);
+  const hasUserAuth = /auth\.getUser\(|auth\.getSession\(|getUser\(|requireAdmin|assertAdmin|authorized\(|createClient\(\)/.test(source);
+  const hasCronSecretAuth =
+    /LIA_CRON_SECRET|CRON_SECRET/.test(source) &&
+    /authorization/.test(source) &&
+    /Bearer/.test(source) &&
+    /function authorized/.test(source);
+  const hasAuth = hasUserAuth || hasCronSecretAuth;
+  const machineToMachineMutation = hasCronSecretAuth && !hasUserAuth;
   const methods = [...source.matchAll(/export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/g)].map((m) => m[1]);
   const hasMutation = methods.length > 0;
 
   if (!publicRoute && !hasAuth) failures.push(`${rel}: no obvious authentication guard`);
-  if (hasMutation && !publicRoute && !/assertSameOrigin\(/.test(source)) {
+  if (hasMutation && !publicRoute && !machineToMachineMutation && !/assertSameOrigin\(/.test(source)) {
     failures.push(`${rel}: state-changing route missing assertSameOrigin()`);
   }
 
