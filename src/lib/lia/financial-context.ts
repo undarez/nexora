@@ -10,10 +10,14 @@ export async function loadLiaFinancialContext({
   supabase,
   userId,
   since,
+  relationalContext,
+  relationalProfile,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
   since: Date;
+  relationalContext: Record<string, unknown> | null;
+  relationalProfile: { relationship_mode?: string; preferred_tone?: string; detail_level?: string; initiative_level?: number; financial_coaching_style?: string; goal_context?: string | null; consented_personalization?: boolean } | undefined;
 }) {
   if (!supabase) throw new Error("Supabase n'est pas configuré.");
 
@@ -36,9 +40,8 @@ export async function loadLiaFinancialContext({
   
     const results = [accountsResult, transactionsResult, budgetsResult, goalsResult, forecastsResult, learningResult, loopsResult, fixedExpensesResult, scenarioResult];
     const firstError = results.find((result) => result.error);
-    if (firstError?.error) {
-      return NextResponse.json({ error: `Impossible de charger les données financières : ${firstError.error.message}` }, { status: 500 });
-    }
+    const contextLoadError = firstError?.error?.message ?? null;
+    if (contextLoadError) return { errorMessage: contextLoadError } as const;
   
     const accounts = accountsResult.data ?? [];
     const transactions = transactionsResult.data ?? [];
@@ -82,7 +85,7 @@ export async function loadLiaFinancialContext({
       console.warn("Modèle financier personnel indisponible; contexte conservateur:", error instanceof Error ? error.message : error);
     }
   
-    const context = compact({
+    const context = JSON.parse(JSON.stringify({
       period: { from: since.toISOString(), to: new Date().toISOString() },
       summary: { account_balance_total: Number(balance.toFixed(2)), income_90d: Number(income90d.toFixed(2)), expenses_90d: Number(expense90d.toFixed(2)), transaction_count: transactions.length },
       financial_data_gateway: financialProjection,
@@ -108,7 +111,7 @@ export async function loadLiaFinancialContext({
         }),
         note: "Ces charges fixes et hypothèses de scénario sont des engagements de planification. Elles doivent être prises en compte avec les transactions observées, sans les confondre.",
       },
-    });
+    }));
   return {
     monthKey,
     accounts,
@@ -128,6 +131,6 @@ export async function loadLiaFinancialContext({
     financialProjection,
     personalFinancialModel,
     context,
-    errorMessage: firstError?.error?.message ?? null,
+    errorMessage: null,
   };
 }
