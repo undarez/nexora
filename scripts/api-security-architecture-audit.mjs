@@ -19,7 +19,7 @@ function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...walk(full));
-    else if (/^route\.(ts|tsx)$/.test(entry.name)) out.push(full);
+    else if (!publicRoute && /^route\.(ts|tsx)$/.test(entry.name)) out.push(full);
   }
   return out;
 }
@@ -34,7 +34,7 @@ for (const file of routes) {
   const rel = "/" + path.relative(root, file).replaceAll(path.sep, "/");
   const source = fs.readFileSync(file, "utf8");
   const publicRoute = publicRoutePatterns.some((pattern) => pattern.test(rel));
-  const hasUserAuth = /auth\.getUser\(|auth\.getSession\(|getUser\(|requireAdmin|assertAdmin|createClient\(\)/.test(source);
+  const hasUserAuth = /auth\.getUser\(|auth\.getSession\(|getUser\(|getMobileAuth\(|requireAdmin|assertAdmin|createClient\(\)/.test(source);
   const hasCronSecretAuth =
     /LIA_CRON_SECRET|CRON_SECRET/.test(source) &&
     /authorization/.test(source) &&
