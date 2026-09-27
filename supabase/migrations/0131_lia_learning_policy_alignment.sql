@@ -72,6 +72,29 @@ begin
     ) into promoted;
     if not promoted then raise exception 'governed_promotion_missing'; end if;
 
+    -- Keep the activation control-plane ledger authoritative: a release may
+    -- activate only the exact promoted candidate version and records the human actor.
+    insert into public.lia_skill_activations(skill_id,version_id,previous_version_id,activated_by,activation_reason)
+      select c.skill_id,c.candidate_version_id,a.version_id,auth.uid(),
+             coalesce(trim(p_reason),'Governed release after completed canary and promoted review.')
+      from public.lia_skill_activations a
+      where a.skill_id=c.skill_id and a.status='active'
+      order by a.created_at desc
+      limit 1;
+
+    if not found then
+      insert into public.lia_skill_activations(skill_id,version_id,previous_version_id,activated_by,activation_reason)
+      values(c.skill_id,c.candidate_version_id,null,auth.uid(),
+             coalesce(trim(p_reason),'Governed release after completed canary and promoted review.'));
+    end if;
+
+    update public.lia_skill_activations
+      set status='rolled_back', rolled_back_by=auth.uid(), rolled_back_at=now_at,
+          rollback_reason='superseded_by_governed_release'
+    where skill_id=c.skill_id
+      and status='active'
+      and version_id<>c.candidate_version_id;
+
     update public.lia_skills
       set active_version_id=c.candidate_version_id, status='active', updated_at=now_at
     where id=c.skill_id;
