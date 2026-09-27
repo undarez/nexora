@@ -27,28 +27,50 @@ export async function loadLiaFinancialContext({
     const monthKey = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}-01`;
   
     const [accountsResult, transactionsResult, budgetsResult, goalsResult, forecastsResult, learningResult, loopsResult, fixedExpensesResult, scenarioResult] = await Promise.all([
-      supabase.from("accounts").select("id,name,kind,balance,currency").eq("user_id", user.id),
-      supabase.from("transactions").select("id,amount,occurred_at,label,source,category_id,categories(name)").eq("user_id", user.id).gte("occurred_at", since.toISOString()).order("occurred_at", { ascending: false }).limit(MAX_TRANSACTIONS),
-      supabase.from("budgets").select("id,period_start,period_end,target_end_balance,budget_lines(id,category_id,planned_amount,actual_amount)").eq("user_id", user.id).order("period_start", { ascending: false }).limit(3),
-      supabase.from("goals").select("name,target_amount,current_amount,target_date,priority").eq("user_id", user.id).order("priority", { ascending: true }),
-      supabase.from("forecasts").select("horizon,scenario,projected_balance,confidence,assumptions,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(9),
-      supabase.from("learning_events").select("event_type,before_value,after_value,evidence,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
-      supabase.from("loop_runs").select("loop_type,period_start,period_end,status,context,findings,recommendations,summary,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(6),
-      supabase.from("fixed_expenses").select("id,label,sector,icon,amount,due_day,recurrence,effective_from,effective_until,is_active,notes").eq("user_id", user.id).eq("is_active", true).order("due_day"),
-      supabase.from("budget_scenarios").select("id,period_start,name,income,starting_balance,safety_reserve,extra_expense,weeks_remaining,envelopes").eq("user_id", user.id).eq("period_start", monthKey).maybeSingle(),
+      supabase.from("accounts").select("id,name,kind,balance,currency").eq("user_id", userId),
+      supabase.from("transactions").select("id,amount,occurred_at,label,source,category_id,categories(name)").eq("user_id", userId).gte("occurred_at", since.toISOString()).order("occurred_at", { ascending: false }).limit(MAX_TRANSACTIONS),
+      supabase.from("budgets").select("id,period_start,period_end,target_end_balance,budget_lines(id,category_id,planned_amount,actual_amount)").eq("user_id", userId).order("period_start", { ascending: false }).limit(3),
+      supabase.from("goals").select("name,target_amount,current_amount,target_date,priority").eq("user_id", userId).order("priority", { ascending: true }),
+      supabase.from("forecasts").select("horizon,scenario,projected_balance,confidence,assumptions,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(9),
+      supabase.from("learning_events").select("event_type,before_value,after_value,evidence,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
+      supabase.from("loop_runs").select("loop_type,period_start,period_end,status,context,findings,recommendations,summary,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(6),
+      supabase.from("fixed_expenses").select("id,label,sector,icon,amount,due_day,recurrence,effective_from,effective_until,is_active,notes").eq("user_id", userId).eq("is_active", true).order("due_day"),
+      supabase.from("budget_scenarios").select("id,period_start,name,income,starting_balance,safety_reserve,extra_expense,weeks_remaining,envelopes").eq("user_id", userId).eq("period_start", monthKey).maybeSingle(),
     ]);
   
     const results = [accountsResult, transactionsResult, budgetsResult, goalsResult, forecastsResult, learningResult, loopsResult, fixedExpensesResult, scenarioResult];
     const firstError = results.find((result) => result.error);
     const contextLoadError = firstError?.error?.message ?? null;
-    if (contextLoadError) return { errorMessage: contextLoadError } as const;
+    if (contextLoadError) {
+      return {
+        monthKey,
+        accounts: [],
+        transactions: [],
+        budgetsResult,
+        goalsResult,
+        forecastsResult,
+        learningResult,
+        loopsResult,
+        fixedExpensesResult,
+        scenarioResult,
+        mailConnections: [],
+        multiSourceContext: buildMultiSourceContext({ financeAvailable: false, financeSummary: { balance: 0 }, mailConnections: [] }),
+        balance: 0,
+        income90d: 0,
+        expense90d: 0,
+        financialProjection: null,
+        personalFinancialModel: null,
+        context: {},
+        errorMessage: contextLoadError,
+      };
+    }
   
     const accounts = accountsResult.data ?? [];
     const transactions = transactionsResult.data ?? [];
     try {
       await learnFinancialHabits({
         supabase,
-        userId: user.id,
+        userId: userId,
         transactions: transactions.map((t: any) => ({ id: String(t.id), label: String(t.label ?? ""), amount: Number(t.amount ?? 0), occurred_at: String(t.occurred_at) })),
       });
     } catch (error) {
@@ -56,7 +78,7 @@ export async function loadLiaFinancialContext({
     }
     let mailConnections: unknown[] = [];
     try {
-      const { data: mailRows } = await supabase.from("lia_mail_connections").select("provider,email,status,last_sync_at").eq("user_id", user.id);
+      const { data: mailRows } = await supabase.from("lia_mail_connections").select("provider,email,status,last_sync_at").eq("user_id", userId);
       mailConnections = (mailRows ?? []).map((m: any) => ({ provider: m.provider, email: m.email ?? null, status: m.status, last_sync_at: m.last_sync_at ?? null }));
     } catch { /* optional integration: financial reasoning must continue without mail */ }
   
@@ -73,14 +95,14 @@ export async function loadLiaFinancialContext({
     // Do not send the Supabase auth UUID to the model: it is not needed for reasoning.
     let financialProjection: Awaited<ReturnType<typeof buildLiaFinancialProjection>> | null = null;
     try {
-      financialProjection = await buildLiaFinancialProjection({ supabase, userId: user.id, days: 90 });
+      financialProjection = await buildLiaFinancialProjection({ supabase, userId: userId, days: 90 });
     } catch (error) {
       console.warn("Passerelle de données financières sécurisée indisponible; contexte LIA réduit:", error instanceof Error ? error.message : error);
     }
   
     let personalFinancialModel: Awaited<ReturnType<typeof buildLiaPersonalFinancialModel>> | null = null;
     try {
-      personalFinancialModel = await buildLiaPersonalFinancialModel({ supabase, userId: user.id, days: 90 });
+      personalFinancialModel = await buildLiaPersonalFinancialModel({ supabase, userId: userId, days: 90 });
     } catch (error) {
       console.warn("Modèle financier personnel indisponible; contexte conservateur:", error instanceof Error ? error.message : error);
     }
