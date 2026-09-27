@@ -5,8 +5,10 @@ import { deterministicLiaAnalysis } from "@/lib/lia/deterministic-engine";
 import { AGENT_TASK_LABELS, SUPERVISOR_PROMPT, TASK_PROMPTS, type AgentTask } from "@/lib/agents/prompts";
 import { runFinancialOrchestration } from "@/lib/agents/orchestrator";
 import { finishAgentLoop, recordAgentLoopStep, recordEvidence, startAgentLoop } from "@/lib/agents/loop-engine";
-import { executeAgentTool, toolsForTask } from "@/lib/agent-runtime/executor";
-import { AgentHarness } from "@/lib/lia/agent-harness";
+import { toolsForTask } from "@/lib/agent-runtime/executor";
+import { handleLiaConversation } from "@/lib/lia/chat-conversation";
+import { selectHumanLiaResponse } from "@/lib/lia/conversation";
+import { executeChatToolsWithHarness } from "@/lib/lia/chat-runtime";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { runCognitivePhase } from "@/lib/lia/cognitive-core";
 import { buildLiaExplainability } from "@/lib/lia/evidence-synthesis";
@@ -27,7 +29,6 @@ import { runNexoraDecisionKernel } from "@/lib/lia/decision-kernel";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
 import { buildLiaFinancialProjection, sanitizeToolResultsForLia } from "@/lib/lia/financial-data-gateway";
 import { buildLiaPersonalFinancialModel, compactLiaPersonalFinancialModel } from "@/lib/lia/personal-financial-model";
-import { detectLiaConversationIntent, deterministicConversationReply, selectHumanLiaResponse, LIA_CONVERSATION_SYSTEM_PROMPT } from "@/lib/lia/conversation";
 import { runFinancialReasoning, formatFinancialReasoning } from "@/lib/lia/financial-reasoning";
 import { runRiskReasoning, formatRiskReasoning } from "@/lib/lia/risk-reasoning";
 import { runBudgetReasoning, formatBudgetReasoning } from "@/lib/lia/budget-reasoning";
@@ -47,42 +48,6 @@ function isTask(value: unknown): value is AgentTask {
   return typeof value === "string" && TASKS.has(value as AgentTask);
 }
 
-async function executeChatToolsWithHarness(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  toolNames: readonly string[],
-  runId: string | null,
-) {
-  if (!supabase) throw new Error("Supabase n'est pas configuré.");
-  const harness = new AgentHarness({ maxSteps: 8, maxToolCalls: 8, maxWallTimeMs: 120_000, maxRepeatedCalls: 1 });
-  const results: Record<string, unknown> = {};
-
-  for (const toolName of toolNames) {
-    const fingerprint = `chat-tool:${toolName}`;
-    const guard = harness.guard("tool", fingerprint);
-    if (!guard.allowed) {
-      results[toolName] = { error: guard.reason, harness_blocked: true };
-      break;
-    }
-    const startedAt = Date.now();
-    try {
-      const remainingMs = Math.max(1_000, harness.limits.maxWallTimeMs - (Date.now() - Date.parse(harness.state.startedAt)));
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Budget temps du harness atteint.")), remainingMs));
-      results[toolName] = await Promise.race([
-        executeAgentTool(supabase, userId, { name: toolName }, { runId }),
-        timeout,
-      ]);
-      harness.record({ kind: "tool", name: toolName, ok: true, startedAt: new Date(startedAt).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, fingerprint });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Outil indisponible.";
-      results[toolName] = { error: message };
-      harness.record({ kind: "tool", name: toolName, ok: false, startedAt: new Date(startedAt).toISOString(), finishedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, fingerprint, error: message.slice(0, 500) });
-    }
-  }
-
-  if (harness.state.status === "running") harness.complete("completed");
-  return { results, harness: harness.summary() };
-}
 
 function estimateRemoteCostCents(outputTokens: number | null, inputChars: number | null) {
   const inputPer1k = Math.max(0, Number(process.env.LIA_REMOTE_INPUT_COST_CENTS_PER_1K || 0));
@@ -121,38 +86,8 @@ export async function POST(request: Request) {
     // Default task/question are valid when no JSON body is supplied.
   }
 
-  // LIA has a true conversational lane. Lightweight social interaction must not
-  // trigger financial database reads, research, planning or recommendations.
-  const conversationIntent = detectLiaConversationIntent(requestedQuestion);
-  if (conversationIntent !== "financial") {
-    const historyContext = history.length > 0
-      ? history.map((m) => ({ role: m.role, content: m.content })).slice(-8)
-      : [];
-    if (["greeting", "wellbeing", "thanks", "farewell", "identity", "small_talk"].includes(conversationIntent)) {
-      const reply = deterministicConversationReply(conversationIntent, requestedQuestion);
-      return NextResponse.json({ analysis: reply, model: "lia-conversation", provider: "deterministic", task: "conversation", conversation: { intent: conversationIntent, financialContextUsed: false } });
-    }
-    try {
-      const result = await liaChat([
-        { role: "system", content: LIA_CONVERSATION_SYSTEM_PROMPT },
-        ...historyContext,
-        { role: "user", content: requestedQuestion },
-      ]);
-      const safeResponse = selectHumanLiaResponse(
-        result.content,
-        deterministicConversationReply("small_talk", requestedQuestion),
-      );
-      return NextResponse.json({
-        analysis: safeResponse.content,
-        model: safeResponse.rejectedGenerated ? "lia-conversation-safety-fallback" : result.model,
-        provider: safeResponse.rejectedGenerated ? "deterministic" : result.provider,
-        task: "conversation",
-        conversation: { intent: conversationIntent, financialContextUsed: false, generatedResponseRejected: safeResponse.rejectedGenerated },
-      });
-    } catch (error) {
-      return NextResponse.json({ analysis: "Je suis là 😊 Dis-moi ce que tu as en tête.", model: "lia-conversation-fallback", provider: "deterministic", task: "conversation", conversation: { intent: conversationIntent, financialContextUsed: false }, warning: error instanceof Error ? error.message : "Mode conversationnel limité." });
-    }
-  }
+  const conversationResponse = await handleLiaConversation(requestedQuestion, history);
+  if (conversationResponse) return conversationResponse;
 
   let loopRunId: string | null = null;
   let goalLifecycle: LiaGoalLifecycle | null = null;
