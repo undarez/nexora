@@ -5,6 +5,7 @@ const root = process.cwd();
 const engine = readFileSync(join(root, "src/lib/lia/autonomy/bounded-engine.ts"), "utf8");
 const runner = readFileSync(join(root, "src/lib/lia/autonomous-goal-runner.ts"), "utf8");
 const executor = readFileSync(join(root, "src/lib/agent-runtime/executor.ts"), "utf8");
+const learning = readFileSync(join(root, "src/lib/lia/learning/autonomous.ts"), "utf8");
 
 const checks = [
   ["bounded engine exists", engine.includes("function autonomousToolSet")],
@@ -13,6 +14,8 @@ const checks = [
   ["L5 has a complex-goal strategy", engine.includes('return "complex_goal"')],
   ["L6 has an adaptive-replan strategy", engine.includes('return "adaptive_replan"')],
   ["L7 is required for validated learning", runner.includes("autonomy.level >= 7")],
+  ["learning tools are blocked below L7", engine.includes("validatedLearningTool && level >= 7") && engine.includes("validated_learning_requires_L7")],
+  ["autonomous learning cycle fail-closes below L7", learning.includes("validated_learning_requires_L7") && learning.includes('rpc("get_lia_autonomy"')],
   ["L8 has an extended-goal strategy", engine.includes('return "extended_goal"')],
   ["strategy reaches reasoning engine", runner.includes("strategy: autonomyProfile.strategy") && readFileSync(join(root, "src/lib/lia/reasoning-engine-v2.ts"), "utf8").includes("strategy?: string")],
   ["policy minimums are consulted", engine.includes("getAgentPolicy(tool.name)")],
