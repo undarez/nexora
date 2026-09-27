@@ -133,7 +133,7 @@ export async function POST(request: Request) {
   let decisionPlan: Awaited<ReturnType<typeof buildLiaDecisionPlan>> | null = null;
   let decisionRecordId: string | null = null;
 
-  const financialContext = await loadLiaFinancialContext({ supabase, userId: user.id, since });
+  const financialContext = await loadLiaFinancialContext({ supabase, userId: user.id, since, relationalContext, relationalProfile });
   if (financialContext.errorMessage) {
     return NextResponse.json({ error: `Impossible de charger les données financières : ${financialContext.errorMessage}` }, { status: 500 });
   }
