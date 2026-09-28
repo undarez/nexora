@@ -9,7 +9,6 @@ import { toolsForTask } from "@/lib/agent-runtime/executor";
 import { loadLiaFinancialContext } from "@/lib/lia/financial-context";
 import { runLiaCognitiveKernel } from "@/lib/lia/cognitive-kernel";
 import { handleLiaConversation } from "@/lib/lia/chat-conversation";
-import { routeLiaQuestion } from "@/lib/lia/decision-router";
 import { selectHumanLiaResponse } from "@/lib/lia/conversation";
 import { executeChatToolsWithHarness } from "@/lib/lia/chat-runtime";
 import { assertSameOrigin } from "@/lib/security/csrf";
@@ -18,10 +17,10 @@ import { buildLiaExplainability } from "@/lib/lia/evidence-synthesis";
 import { runLiveResearch } from "@/lib/lia/research/live";
 import { compactMemoryContext, createMemoryCandidate, retrieveLiaMemories } from "@/lib/lia/memory-context";
 import { recordCognitiveOrchestration } from "@/lib/lia/cognitive-orchestrator";
-import { advanceGoalLifecycle, createGoalLifecycle, lifecycleForResponse, persistGoalLifecycle, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
-import { getOrCreateCognitiveSession, touchCognitiveSession, recordCognitiveSessionTurn, updateCognitiveSessionContext, type LiaCognitiveSession } from "@/lib/lia/cognitive-session";
-import { detectExplicitRelationalFeedback, recordExplicitRelationalFeedback } from "@/lib/lia/relational-learning";
-import { buildLiaDecisionPlan, persistLiaDecision } from "@/lib/lia/decision-engine";
+import { lifecycleForResponse, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
+import type { LiaCognitiveSession } from "@/lib/lia/cognitive-session";
+import { initializeLiaSessionGoalState, createOrResumeLiaGoal, updateLiaGoalState, persistLiaSessionTurn, learnExplicitLiaRelationalFeedback } from "@/lib/lia/session-goal-orchestration";
+import { buildAndPersistLiaDecisionPlan } from "@/lib/lia/decision-plan-orchestration";
 import { buildLiaBrainContext, compactBrainContext, recordFinancialBrainOutcome, recordFinancialMemoryVersion, recordLiaProductionTelemetry } from "@/lib/lia/financial-memory/pipeline";
 import { evaluateAndCorrectLiaResponse } from "@/lib/lia/self-evaluation";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
@@ -89,21 +88,19 @@ export async function POST(request: Request) {
   let cognitiveSession: LiaCognitiveSession | null = null;
   let sessionParentLoopRunId: string | null = null;
   let sessionTurnIndex = 1;
-  try {
-    cognitiveSession = await getOrCreateCognitiveSession(supabase, user.id, requestedSessionId);
-    sessionParentLoopRunId = cognitiveSession.activeLoopRunId;
-    sessionTurnIndex = cognitiveSession.turnCount + 1;
-    if (!requestedLoopRunId && cognitiveSession.activeLoopRunId) requestedLoopRunId = cognitiveSession.activeLoopRunId;
-    // If the UI was refreshed, restore the last turn as bounded working context.
-    if (history.length === 0 && cognitiveSession.lastUserMessage) {
-      history = ([
-        { role: "user" as const, content: cognitiveSession.lastUserMessage.slice(0, 3000) },
-        ...(cognitiveSession.lastAssistantMessage ? [{ role: "assistant" as const, content: cognitiveSession.lastAssistantMessage.slice(0, 3000) }] : []),
-      ] as Array<{ role: "user" | "assistant"; content: string }>).slice(-8);
-    }
-  } catch (error) {
-    console.warn("Session cognitive indisponible; poursuite sans session:", error instanceof Error ? error.message : error);
-  }
+
+  const sessionState = await initializeLiaSessionGoalState({
+    supabase,
+    userId: user.id,
+    requestedSessionId,
+    requestedLoopRunId,
+    history,
+  });
+  cognitiveSession = sessionState.cognitiveSession;
+  requestedLoopRunId = sessionState.requestedLoopRunId;
+  sessionParentLoopRunId = sessionState.sessionParentLoopRunId;
+  sessionTurnIndex = sessionState.sessionTurnIndex;
+  history = sessionState.history;
   const since = new Date();
   since.setDate(since.getDate() - 90);
   const startedAt = Date.now();
@@ -127,7 +124,7 @@ export async function POST(request: Request) {
     consented_personalization?: boolean;
   } | undefined;
 
-  let decisionPlan: Awaited<ReturnType<typeof buildLiaDecisionPlan>> | null = null;
+  let decisionPlan: Awaited<ReturnType<typeof buildAndPersistLiaDecisionPlan>>["plan"] | null = null;
   let decisionRecordId: string | null = null;
 
   const financialContext = await loadLiaFinancialContext({ supabase, userId: user.id, since, relationalContext, relationalProfile });
@@ -155,50 +152,39 @@ export async function POST(request: Request) {
     context,
   } = financialContext;
   try {
-    decisionPlan = await buildLiaDecisionPlan({
+    const decisionOrchestration = await buildAndPersistLiaDecisionPlan({
       supabase,
       userId: user.id,
       objective: requestedQuestion,
-      financialContext: accounts.length > 0 || transactions.length > 0,
-      budgetContext: (budgetsResult.data ?? []).length > 0,
-      externalInformation: routeLiaQuestion(requestedQuestion, { hasAccounts: accounts.length > 0, hasTransactions: transactions.length > 0, hasBudgets: (budgetsResult.data ?? []).length > 0, hasForecasts: (forecastsResult.data ?? []).length > 0 }).externalResearch,
+      context: {
+        task,
+        financialContext: accounts.length > 0 || transactions.length > 0,
+        budgetContext: (budgetsResult.data ?? []).length > 0,
+        forecastContext: (forecastsResult.data ?? []).length > 0,
+      },
     });
-    decisionRecordId = await persistLiaDecision({
-      supabase, userId: user.id, objective: requestedQuestion, plan: decisionPlan,
-      context: { task, financial_context: accounts.length > 0 || transactions.length > 0, budget_context: (budgetsResult.data ?? []).length > 0 },
-    });
+    decisionPlan = decisionOrchestration.plan;
+    decisionRecordId = decisionOrchestration.decisionRecordId;
   } catch (error) {
     console.warn("Decision Engine indisponible; poursuite bornée:", error instanceof Error ? error.message : error);
   }
 
+  const goalState = await createOrResumeLiaGoal({
+    supabase,
+    userId: user.id,
+    requestedLoopRunId,
+    requestedQuestion,
+    task,
+    transactionCount: transactions.length,
+    cognitiveSession,
+  });
+  if (goalState.resumeRejected) {
+    return NextResponse.json({ error: "Cette boucle LIA ne peut plus être reprise. Créez un nouvel objectif." }, { status: 409 });
+  }
+  loopRunId = goalState.loopRunId;
+  goalLifecycle = goalState.goalLifecycle;
+
   try {
-    if (requestedLoopRunId) {
-      const { data: resumeRun, error: resumeError } = await supabase
-        .from("agent_loop_runs")
-        .select("id,status,goal,context")
-        .eq("id", requestedLoopRunId)
-        .eq("user_id", user.id)
-        .single();
-      const savedLifecycle = resumeRun?.context?.goal_lifecycle as LiaGoalLifecycle | undefined;
-      const resumable = resumeRun && !resumeError && (resumeRun.status === "running" || resumeRun.status === "blocked" || resumeRun.status === "needs_human") && savedLifecycle;
-      if (resumable) {
-        const resumedLoopRunId = resumeRun.id as string;
-        loopRunId = resumedLoopRunId;
-        goalLifecycle = savedLifecycle;
-        goalLifecycle = advanceGoalLifecycle(goalLifecycle, "understanding", "reprendre le contexte et traiter la nouvelle information", { completedStep: "resume" });
-        await supabase.from("agent_loop_runs").update({ status: "running", completed_at: null }).eq("id", loopRunId).eq("user_id", user.id);
-        await persistGoalLifecycle(supabase, resumedLoopRunId, goalLifecycle);
-      } else {
-        return NextResponse.json({ error: "Cette boucle LIA ne peut plus être reprise. Créez un nouvel objectif." }, { status: 409 });
-      }
-    } else {
-      const createdLoopRunId = await startAgentLoop(supabase, user.id, requestedQuestion, "user_request", { task, transaction_count: transactions.length, session_id: cognitiveSession?.id ?? null, parent_loop_run_id: sessionParentLoopRunId });
-      loopRunId = createdLoopRunId;
-      let inheritedObjective = requestedQuestion;
-      if (cognitiveSession?.context?.active_goal_objective && typeof cognitiveSession.context.active_goal_objective === "string") inheritedObjective = cognitiveSession.context.active_goal_objective.slice(0, 2000);
-      goalLifecycle = createGoalLifecycle(loopRunId, inheritedObjective);
-      await persistGoalLifecycle(supabase, createdLoopRunId, goalLifecycle);
-    }
     if (!loopRunId) throw new Error("Boucle agentique indisponible.");
     await recordAgentLoopStep(supabase, loopRunId, 1, { phase: "observe", agentKey: "system:data", input: { transaction_count: transactions.length, account_count: accounts.length }, output: { balance: Number(balance.toFixed(2)), income_90d: Number(income90d.toFixed(2)), expenses_90d: Number(expense90d.toFixed(2)) } });
     await recordEvidence(supabase, loopRunId, "supabase", "financial_snapshot", { account_count: accounts.length, transaction_count: transactions.length, balance: Number(balance.toFixed(2)) });
@@ -382,16 +368,45 @@ export async function POST(request: Request) {
 
   if (loopRunId && goalLifecycle) {
     try {
-      goalLifecycle = advanceGoalLifecycle(goalLifecycle, decision.decision === "research" ? "researching" : "planning", decision.decision === "research" ? "rechercher les informations externes nécessaires" : "préparer la résolution", { completedStep: "decision" });
-      await persistGoalLifecycle(supabase, loopRunId, goalLifecycle);
+      goalLifecycle = await updateLiaGoalState({
+        supabase,
+        loopRunId,
+        goalLifecycle,
+        state: decision.decision === "research" ? "researching" : "planning",
+        nextAction: decision.decision === "research" ? "rechercher les informations externes nécessaires" : "préparer la résolution",
+        details: { completedStep: "decision" },
+      });
     } catch (error) { console.warn("Impossible de mettre à jour l'état de l'objectif:", error instanceof Error ? error.message : error); }
   }
 
   if (decision.decision === "clarify") {
     const clarification = decision.clarification ?? "Peux-tu préciser ta demande ?";
-    if (loopRunId && goalLifecycle) { try { goalLifecycle = advanceGoalLifecycle(goalLifecycle, "needs_human", "répondre à la demande de précision", { completedStep: "understanding", blocker: clarification }); await persistGoalLifecycle(supabase, loopRunId, goalLifecycle); } catch {} }
+    if (loopRunId && goalLifecycle) {
+      try {
+        goalLifecycle = await updateLiaGoalState({
+          supabase,
+          loopRunId,
+          goalLifecycle,
+          state: "needs_human",
+          nextAction: "répondre à la demande de précision",
+          details: { completedStep: "understanding", blocker: clarification },
+        });
+      } catch {}
+    }
     if (cognitiveSession) {
-      try { await touchCognitiveSession(supabase, cognitiveSession.id, user.id, loopRunId, requestedQuestion, clarification); } catch {}
+      try {
+        await persistLiaSessionTurn({
+          supabase,
+          userId: user.id,
+          cognitiveSession,
+          loopRunId,
+          goalLifecycle,
+          sessionTurnIndex,
+          question: requestedQuestion,
+          answer: clarification,
+          decision: decision.decision,
+        });
+      } catch {}
     }
     return NextResponse.json({
       analysis: clarification,
@@ -490,8 +505,14 @@ export async function POST(request: Request) {
 
   if (loopRunId && goalLifecycle) {
     try {
-      goalLifecycle = advanceGoalLifecycle(goalLifecycle, research ? "researching" : "planning", research ? "évaluer les preuves acquises" : "raisonner avec le contexte disponible", { completedStep: research ? "research" : "context" });
-      await persistGoalLifecycle(supabase, loopRunId, goalLifecycle);
+      goalLifecycle = await updateLiaGoalState({
+        supabase,
+        loopRunId,
+        goalLifecycle,
+        state: research ? "researching" : "planning",
+        nextAction: research ? "évaluer les preuves acquises" : "raisonner avec le contexte disponible",
+        details: { completedStep: research ? "research" : "context" },
+      });
     } catch {}
   }
 
@@ -621,8 +642,14 @@ export async function POST(request: Request) {
 
   if (loopRunId && goalLifecycle) {
     try {
-      goalLifecycle = advanceGoalLifecycle(goalLifecycle, "evaluating", "vérifier la qualité, la sécurité et les preuves de la réponse", { completedStep: "execution" });
-      await persistGoalLifecycle(supabase, loopRunId, goalLifecycle);
+      goalLifecycle = await updateLiaGoalState({
+        supabase,
+        loopRunId,
+        goalLifecycle,
+        state: "evaluating",
+        nextAction: "vérifier la qualité, la sécurité et les preuves de la réponse",
+        details: { completedStep: "execution" },
+      });
     } catch {}
   }
 
@@ -795,29 +822,36 @@ export async function POST(request: Request) {
       // Keep the goal active for the bounded autonomous runner. The runner
       // performs the final deterministic observations/verification before
       // closing the lifecycle; the model never gets completion authority.
-      goalLifecycle = advanceGoalLifecycle(goalLifecycle, "evaluating", "exécuter la vérification autonome bornée avant de clôturer l'objectif", { completedStep: "evaluation_prepared", result: { model, recommendation_only: true } });
-      await persistGoalLifecycle(supabase, loopRunId, goalLifecycle);
+      goalLifecycle = await updateLiaGoalState({
+        supabase,
+        loopRunId,
+        goalLifecycle,
+        state: "evaluating",
+        nextAction: "exécuter la vérification autonome bornée avant de clôturer l'objectif",
+        details: { completedStep: "evaluation_prepared", result: { model, recommendation_only: true } },
+      });
     } catch {}
   }
 
-  if (cognitiveSession) {
-    try {
-      await touchCognitiveSession(supabase, cognitiveSession.id, user.id, goalLifecycle?.state === "completed" ? null : loopRunId, requestedQuestion, analysis);
-      await recordCognitiveSessionTurn(supabase, { sessionId: cognitiveSession.id, userId: user.id, turnIndex: sessionTurnIndex, loopRunId, question: requestedQuestion, answer: analysis, loopStatus: goalLifecycle?.state ?? "completed", goalState: goalLifecycle?.state ?? null, progress: goalLifecycle?.progress ?? 100, decision: decision.decision });
-      await updateCognitiveSessionContext(supabase, cognitiveSession.id, user.id, { active_goal_objective: goalLifecycle?.objective ?? requestedQuestion, last_loop_run_id: loopRunId, last_goal_state: goalLifecycle?.state ?? null, last_progress: goalLifecycle?.progress ?? 100, last_decision: decision.decision });
-    } catch (error) { console.warn("Impossible d'actualiser la session cognitive:", error instanceof Error ? error.message : error); }
-  }
+  await persistLiaSessionTurn({
+    supabase,
+    userId: user.id,
+    cognitiveSession,
+    loopRunId,
+    goalLifecycle,
+    sessionTurnIndex,
+    question: requestedQuestion,
+    answer: analysis,
+    decision: decision.decision,
+  });
 
   // Learn relational preferences only from explicit user feedback.
-  // Inferred preferences never silently overwrite the profile.
-  try {
-    const relationalFeedback = detectExplicitRelationalFeedback(requestedQuestion);
-    if (relationalFeedback && relationalProfile?.consented_personalization === true) {
-      await recordExplicitRelationalFeedback(supabase, user.id, relationalFeedback);
-    }
-  } catch (error) {
-    console.warn("Apprentissage relationnel indisponible:", error instanceof Error ? error.message : error);
-  }
+  await learnExplicitLiaRelationalFeedback({
+    supabase,
+    userId: user.id,
+    message: requestedQuestion,
+    consentedPersonalization: relationalProfile?.consented_personalization === true,
+  });
 
   return NextResponse.json({
     analysis,
