@@ -833,24 +833,25 @@ export async function POST(request: Request) {
     } catch {}
   }
 
-  if (cognitiveSession) {
-    try {
-      await touchCognitiveSession(supabase, cognitiveSession.id, user.id, goalLifecycle?.state === "completed" ? null : loopRunId, requestedQuestion, analysis);
-      await recordCognitiveSessionTurn(supabase, { sessionId: cognitiveSession.id, userId: user.id, turnIndex: sessionTurnIndex, loopRunId, question: requestedQuestion, answer: analysis, loopStatus: goalLifecycle?.state ?? "completed", goalState: goalLifecycle?.state ?? null, progress: goalLifecycle?.progress ?? 100, decision: decision.decision });
-      await updateCognitiveSessionContext(supabase, cognitiveSession.id, user.id, { active_goal_objective: goalLifecycle?.objective ?? requestedQuestion, last_loop_run_id: loopRunId, last_goal_state: goalLifecycle?.state ?? null, last_progress: goalLifecycle?.progress ?? 100, last_decision: decision.decision });
-    } catch (error) { console.warn("Impossible d'actualiser la session cognitive:", error instanceof Error ? error.message : error); }
-  }
+  await persistLiaSessionTurn({
+    supabase,
+    userId: user.id,
+    cognitiveSession,
+    loopRunId,
+    goalLifecycle,
+    sessionTurnIndex,
+    question: requestedQuestion,
+    answer: analysis,
+    decision: decision.decision,
+  });
 
   // Learn relational preferences only from explicit user feedback.
-  // Inferred preferences never silently overwrite the profile.
-  try {
-    const relationalFeedback = detectExplicitRelationalFeedback(requestedQuestion);
-    if (relationalFeedback && relationalProfile?.consented_personalization === true) {
-      await recordExplicitRelationalFeedback(supabase, user.id, relationalFeedback);
-    }
-  } catch (error) {
-    console.warn("Apprentissage relationnel indisponible:", error instanceof Error ? error.message : error);
-  }
+  await learnExplicitLiaRelationalFeedback({
+    supabase,
+    userId: user.id,
+    message: requestedQuestion,
+    consentedPersonalization: relationalProfile?.consented_personalization === true,
+  });
 
   return NextResponse.json({
     analysis,
