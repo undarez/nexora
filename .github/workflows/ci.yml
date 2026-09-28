@@ -71,6 +71,8 @@ jobs:
         run: npm run lia:session-goal-orchestration
       - name: Decision plan regression
         run: npm run lia:decision-plan
+      - name: Brain context regression
+        run: npm run lia:brain-context
 
       - name: Verification / recovery regressions
         run: |

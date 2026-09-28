@@ -21,7 +21,8 @@ import { lifecycleForResponse, type LiaGoalLifecycle } from "@/lib/lia/goal-life
 import type { LiaCognitiveSession } from "@/lib/lia/cognitive-session";
 import { initializeLiaSessionGoalState, createOrResumeLiaGoal, updateLiaGoalState, persistLiaSessionTurn, learnExplicitLiaRelationalFeedback } from "@/lib/lia/session-goal-orchestration";
 import { buildAndPersistLiaDecisionPlan } from "@/lib/lia/decision-plan-orchestration";
-import { buildLiaBrainContext, compactBrainContext, recordFinancialBrainOutcome, recordFinancialMemoryVersion, recordLiaProductionTelemetry } from "@/lib/lia/financial-memory/pipeline";
+import { compactBrainContext, recordFinancialBrainOutcome, recordFinancialMemoryVersion, recordLiaProductionTelemetry } from "@/lib/lia/financial-memory/pipeline";
+import { loadLiaBrainContextForTurn } from "@/lib/lia/brain-context-orchestration";
 import { evaluateAndCorrectLiaResponse } from "@/lib/lia/self-evaluation";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
 import { sanitizeToolResultsForLia } from "@/lib/lia/financial-data-gateway";
@@ -200,34 +201,19 @@ export async function POST(request: Request) {
 
   // Execute deterministic server-side tools before asking the model to reason.
   // The model receives their outputs as evidence; it never gets direct database access.
-  let brainContext: Awaited<ReturnType<typeof buildLiaBrainContext>> | null = null;
-  try {
-    brainContext = await buildLiaBrainContext({
-      supabase,
-      userId: user.id,
-      query: requestedQuestion,
-      loopRunId,
-      transactions: transactions.map((t: any) => ({ id: String(t.id), label: String(t.label ?? ""), amount: Number(t.amount ?? 0), occurred_at: String(t.occurred_at) })),
-    });
-    if (loopRunId) {
-      await recordAgentLoopStep(supabase, loopRunId, 25, {
-        phase: "context",
-        agentKey: "lia:financial-brain",
-        input: { query: requestedQuestion.slice(0, 500) },
-        output: {
-          governed_skill: brainContext.skill?.slug ?? null,
-          skill_version: brainContext.skill?.version ?? null,
-          knowledge_count: brainContext.knowledge.length,
-          memory_count: brainContext.memories.length,
-          habit_count: brainContext.habits.length,
-          relational_included: Boolean(brainContext.relational),
-        },
-        status: "completed",
-      });
-    }
-  } catch (error) {
-    console.warn("Contexte cerveau financier indisponible; poursuite bornée:", error instanceof Error ? error.message : error);
-  }
+  let brainContext: Awaited<ReturnType<typeof loadLiaBrainContextForTurn>> = null;
+  brainContext = await loadLiaBrainContextForTurn({
+    supabase,
+    userId: user.id,
+    query: requestedQuestion,
+    loopRunId,
+    transactions: transactions.map((t: any) => ({
+      id: String(t.id),
+      label: String(t.label ?? ""),
+      amount: Number(t.amount ?? 0),
+      occurred_at: String(t.occurred_at),
+    })),
+  });
 
   const toolNames = toolsForTask(task);
   const toolExecution = await executeChatToolsWithHarness(supabase, user.id, toolNames, loopRunId);
