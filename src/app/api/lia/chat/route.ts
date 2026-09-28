@@ -7,14 +7,15 @@ import { runFinancialOrchestration } from "@/lib/agents/orchestrator";
 import { finishAgentLoop, recordAgentLoopStep, recordEvidence, startAgentLoop } from "@/lib/agents/loop-engine";
 import { toolsForTask } from "@/lib/agent-runtime/executor";
 import { loadLiaFinancialContext } from "@/lib/lia/financial-context";
+import { runLiaCognitiveKernel } from "@/lib/lia/cognitive-kernel";
 import { handleLiaConversation } from "@/lib/lia/chat-conversation";
+import { routeLiaQuestion } from "@/lib/lia/decision-router";
 import { selectHumanLiaResponse } from "@/lib/lia/conversation";
 import { executeChatToolsWithHarness } from "@/lib/lia/chat-runtime";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { runCognitivePhase } from "@/lib/lia/cognitive-core";
 import { buildLiaExplainability } from "@/lib/lia/evidence-synthesis";
 import { runLiveResearch } from "@/lib/lia/research/live";
-import { routeLiaQuestion } from "@/lib/lia/decision-router";
 import { compactMemoryContext, createMemoryCandidate, retrieveLiaMemories } from "@/lib/lia/memory-context";
 import { recordCognitiveOrchestration } from "@/lib/lia/cognitive-orchestrator";
 import { advanceGoalLifecycle, createGoalLifecycle, lifecycleForResponse, persistGoalLifecycle, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
@@ -22,11 +23,7 @@ import { getOrCreateCognitiveSession, touchCognitiveSession, recordCognitiveSess
 import { detectExplicitRelationalFeedback, recordExplicitRelationalFeedback } from "@/lib/lia/relational-learning";
 import { buildLiaDecisionPlan, persistLiaDecision } from "@/lib/lia/decision-engine";
 import { buildLiaBrainContext, compactBrainContext, recordFinancialBrainOutcome, recordFinancialMemoryVersion, recordLiaProductionTelemetry } from "@/lib/lia/financial-memory/pipeline";
-import { runReasoningKernel } from "@/lib/lia/reasoning-kernel";
-import { buildNexoraPlan } from "@/lib/lia/planning-kernel";
-import { critiqueNexoraPlan } from "@/lib/lia/critique-kernel";
 import { evaluateAndCorrectLiaResponse } from "@/lib/lia/self-evaluation";
-import { runNexoraDecisionKernel } from "@/lib/lia/decision-kernel";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
 import { sanitizeToolResultsForLia } from "@/lib/lia/financial-data-gateway";
 import { runFinancialReasoning, formatFinancialReasoning } from "@/lib/lia/financial-reasoning";
@@ -277,25 +274,20 @@ export async function POST(request: Request) {
     } catch (error) { console.warn("Phases cognitives préparatoires non enregistrées:", error instanceof Error ? error.message : error); }
   }
 
-  const decision = routeLiaQuestion(requestedQuestion, {
-    hasAccounts: accounts.length > 0,
-    hasTransactions: transactions.length > 0,
-    hasBudgets: (budgetsResult.data ?? []).length > 0,
-    hasForecasts: (forecastsResult.data ?? []).length > 0,
-  });
-
-  // NEXORA Reasoning Kernel: deterministic intent/evidence/risk analysis before
-  // any language engine. This layer is authoritative for cognitive routing,
-  // but never grants permission to perform a financial write.
-  const reasoning = runReasoningKernel({
+  const cognitiveKernel = runLiaCognitiveKernel({
     question: requestedQuestion,
     hasAccounts: accounts.length > 0,
     hasTransactions: transactions.length > 0,
     hasBudgets: (budgetsResult.data ?? []).length > 0,
     hasForecasts: (forecastsResult.data ?? []).length > 0,
     hasGoals: (goalsResult.data ?? []).length > 0,
-    externalResearchRequested: decision.externalResearch,
   });
+  const decision = cognitiveKernel.routing;
+  const reasoning = cognitiveKernel.reasoning;
+  const planning = cognitiveKernel.planning;
+  const critique = cognitiveKernel.critique;
+  const nexoraDecision = cognitiveKernel.decision;
+
   if (loopRunId) {
     try {
       await recordAgentLoopStep(supabase, loopRunId, 105, {
@@ -310,7 +302,7 @@ export async function POST(request: Request) {
       console.warn("Impossible d'enregistrer le Reasoning Kernel:", error instanceof Error ? error.message : error);
     }
   }
-  const planning = buildNexoraPlan({ objective: requestedQuestion, reasoning });
+
   if (loopRunId) {
     try {
       await recordAgentLoopStep(supabase, loopRunId, 107, {
@@ -326,13 +318,6 @@ export async function POST(request: Request) {
     }
   }
 
-  const critique = critiqueNexoraPlan({ reasoning, plan: planning });
-  const nexoraDecision = runNexoraDecisionKernel({
-    reasoning,
-    planning,
-    critique,
-    externalResearchAvailable: false,
-  });
   if (loopRunId) {
     try {
       await recordAgentLoopStep(supabase, loopRunId, 108, {
