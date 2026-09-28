@@ -118,7 +118,8 @@
     "lia:session-goal-orchestration": "node scripts/lia-session-goal-orchestration-regression.mjs",
     "lia:decision-plan": "node scripts/lia-decision-plan-regression.mjs",
     "lia:brain-context": "node scripts/lia-brain-context-regression.mjs",
-    "lia:memory-knowledge": "node scripts/lia-memory-knowledge-regression.mjs"
+    "lia:memory-knowledge": "node scripts/lia-memory-knowledge-regression.mjs",
+    "lia:recommendation": "node scripts/lia-recommendation-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",
