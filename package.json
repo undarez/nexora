@@ -114,7 +114,8 @@
     "lia:bounded-autonomy": "node scripts/lia-bounded-autonomy-regression.mjs",
     "security:api-architecture": "node scripts/api-security-architecture-audit.mjs",
     "security:lia-phase1-1": "node scripts/lia-phase1-1-security-regression.mjs",
-    "financial:notifications": "node scripts/financial-notification-unified-ledger-regression.mjs"
+    "financial:notifications": "node scripts/financial-notification-unified-ledger-regression.mjs",
+    "lia:session-goal-orchestration": "node scripts/lia-session-goal-orchestration-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",
