@@ -9,7 +9,6 @@ import { toolsForTask } from "@/lib/agent-runtime/executor";
 import { loadLiaFinancialContext } from "@/lib/lia/financial-context";
 import { runLiaCognitiveKernel } from "@/lib/lia/cognitive-kernel";
 import { handleLiaConversation } from "@/lib/lia/chat-conversation";
-import { routeLiaQuestion } from "@/lib/lia/decision-router";
 import { selectHumanLiaResponse } from "@/lib/lia/conversation";
 import { executeChatToolsWithHarness } from "@/lib/lia/chat-runtime";
 import { assertSameOrigin } from "@/lib/security/csrf";
@@ -21,7 +20,7 @@ import { recordCognitiveOrchestration } from "@/lib/lia/cognitive-orchestrator";
 import { lifecycleForResponse, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
 import type { LiaCognitiveSession } from "@/lib/lia/cognitive-session";
 import { initializeLiaSessionGoalState, createOrResumeLiaGoal, updateLiaGoalState, persistLiaSessionTurn, learnExplicitLiaRelationalFeedback } from "@/lib/lia/session-goal-orchestration";
-import { buildLiaDecisionPlan, persistLiaDecision } from "@/lib/lia/decision-engine";
+import { buildAndPersistLiaDecisionPlan } from "@/lib/lia/decision-plan-orchestration";
 import { buildLiaBrainContext, compactBrainContext, recordFinancialBrainOutcome, recordFinancialMemoryVersion, recordLiaProductionTelemetry } from "@/lib/lia/financial-memory/pipeline";
 import { evaluateAndCorrectLiaResponse } from "@/lib/lia/self-evaluation";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
@@ -125,7 +124,7 @@ export async function POST(request: Request) {
     consented_personalization?: boolean;
   } | undefined;
 
-  let decisionPlan: Awaited<ReturnType<typeof buildLiaDecisionPlan>> | null = null;
+  let decisionPlan: Awaited<ReturnType<typeof buildAndPersistLiaDecisionPlan>>["plan"] | null = null;
   let decisionRecordId: string | null = null;
 
   const financialContext = await loadLiaFinancialContext({ supabase, userId: user.id, since, relationalContext, relationalProfile });
@@ -153,18 +152,19 @@ export async function POST(request: Request) {
     context,
   } = financialContext;
   try {
-    decisionPlan = await buildLiaDecisionPlan({
+    const decisionOrchestration = await buildAndPersistLiaDecisionPlan({
       supabase,
       userId: user.id,
       objective: requestedQuestion,
-      financialContext: accounts.length > 0 || transactions.length > 0,
-      budgetContext: (budgetsResult.data ?? []).length > 0,
-      externalInformation: routeLiaQuestion(requestedQuestion, { hasAccounts: accounts.length > 0, hasTransactions: transactions.length > 0, hasBudgets: (budgetsResult.data ?? []).length > 0, hasForecasts: (forecastsResult.data ?? []).length > 0 }).externalResearch,
+      context: {
+        task,
+        financialContext: accounts.length > 0 || transactions.length > 0,
+        budgetContext: (budgetsResult.data ?? []).length > 0,
+        forecastContext: (forecastsResult.data ?? []).length > 0,
+      },
     });
-    decisionRecordId = await persistLiaDecision({
-      supabase, userId: user.id, objective: requestedQuestion, plan: decisionPlan,
-      context: { task, financial_context: accounts.length > 0 || transactions.length > 0, budget_context: (budgetsResult.data ?? []).length > 0 },
-    });
+    decisionPlan = decisionOrchestration.plan;
+    decisionRecordId = decisionOrchestration.decisionRecordId;
   } catch (error) {
     console.warn("Decision Engine indisponible; poursuite bornée:", error instanceof Error ? error.message : error);
   }
