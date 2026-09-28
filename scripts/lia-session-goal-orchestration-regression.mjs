@@ -23,4 +23,4 @@ assert.doesNotMatch(orchestration, /NextResponse|createClient\(\)|from\(["'](acc
 assert.match(orchestration, /financialWriteAllowed|financial/);
 assert.match(orchestration, /consentedPersonalization/);
 
-console.log("PASS LIA session/goal orchestration boundary: route delegates lifecycle/session persistence and facade has no financial authority.");
+// Keep this assertion file intentionally structural: it protects the boundary without executing financial writes.\nconsole.log("PASS LIA session/goal orchestration boundary: route delegates lifecycle/session persistence and facade has no financial authority.");
