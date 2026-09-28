@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildLiaDecisionPlan, persistLiaDecision, type LiaDecisionPlan } from "@/lib/lia/decision-engine";
+import { routeLiaQuestion } from "@/lib/lia/decision-router";
 
 export type LiaDecisionPlanContext = {
   financialContext: boolean;
   budgetContext: boolean;
-  externalInformation: boolean;
+  forecastContext: boolean;
   task: string;
 };
 
@@ -20,7 +21,12 @@ export async function buildAndPersistLiaDecisionPlan(args: {
     objective: args.objective,
     financialContext: args.context.financialContext,
     budgetContext: args.context.budgetContext,
-    externalInformation: args.context.externalInformation,
+    externalInformation: routeLiaQuestion(args.objective, {
+      hasAccounts: args.context.financialContext,
+      hasTransactions: args.context.financialContext,
+      hasBudgets: args.context.budgetContext,
+      hasForecasts: args.context.forecastContext,
+    }).externalResearch,
   });
 
   const decisionRecordId = await persistLiaDecision({
