@@ -169,34 +169,22 @@ export async function POST(request: Request) {
     console.warn("Decision Engine indisponible; poursuite bornée:", error instanceof Error ? error.message : error);
   }
 
+  const goalState = await createOrResumeLiaGoal({
+    supabase,
+    userId: user.id,
+    requestedLoopRunId,
+    requestedQuestion,
+    task,
+    transactionCount: transactions.length,
+    cognitiveSession,
+  });
+  if (goalState.resumeRejected) {
+    return NextResponse.json({ error: "Cette boucle LIA ne peut plus être reprise. Créez un nouvel objectif." }, { status: 409 });
+  }
+  loopRunId = goalState.loopRunId;
+  goalLifecycle = goalState.goalLifecycle;
+
   try {
-    if (requestedLoopRunId) {
-      const { data: resumeRun, error: resumeError } = await supabase
-        .from("agent_loop_runs")
-        .select("id,status,goal,context")
-        .eq("id", requestedLoopRunId)
-        .eq("user_id", user.id)
-        .single();
-      const savedLifecycle = resumeRun?.context?.goal_lifecycle as LiaGoalLifecycle | undefined;
-      const resumable = resumeRun && !resumeError && (resumeRun.status === "running" || resumeRun.status === "blocked" || resumeRun.status === "needs_human") && savedLifecycle;
-      if (resumable) {
-        const resumedLoopRunId = resumeRun.id as string;
-        loopRunId = resumedLoopRunId;
-        goalLifecycle = savedLifecycle;
-        goalLifecycle = advanceGoalLifecycle(goalLifecycle, "understanding", "reprendre le contexte et traiter la nouvelle information", { completedStep: "resume" });
-        await supabase.from("agent_loop_runs").update({ status: "running", completed_at: null }).eq("id", loopRunId).eq("user_id", user.id);
-        await persistGoalLifecycle(supabase, resumedLoopRunId, goalLifecycle);
-      } else {
-        return NextResponse.json({ error: "Cette boucle LIA ne peut plus être reprise. Créez un nouvel objectif." }, { status: 409 });
-      }
-    } else {
-      const createdLoopRunId = await startAgentLoop(supabase, user.id, requestedQuestion, "user_request", { task, transaction_count: transactions.length, session_id: cognitiveSession?.id ?? null, parent_loop_run_id: sessionParentLoopRunId });
-      loopRunId = createdLoopRunId;
-      let inheritedObjective = requestedQuestion;
-      if (cognitiveSession?.context?.active_goal_objective && typeof cognitiveSession.context.active_goal_objective === "string") inheritedObjective = cognitiveSession.context.active_goal_objective.slice(0, 2000);
-      goalLifecycle = createGoalLifecycle(loopRunId, inheritedObjective);
-      await persistGoalLifecycle(supabase, createdLoopRunId, goalLifecycle);
-    }
     if (!loopRunId) throw new Error("Boucle agentique indisponible.");
     await recordAgentLoopStep(supabase, loopRunId, 1, { phase: "observe", agentKey: "system:data", input: { transaction_count: transactions.length, account_count: accounts.length }, output: { balance: Number(balance.toFixed(2)), income_90d: Number(income90d.toFixed(2)), expenses_90d: Number(expense90d.toFixed(2)) } });
     await recordEvidence(supabase, loopRunId, "supabase", "financial_snapshot", { account_count: accounts.length, transaction_count: transactions.length, balance: Number(balance.toFixed(2)) });
