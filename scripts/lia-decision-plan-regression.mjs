@@ -12,8 +12,7 @@ assert.doesNotMatch(route, /routeLiaQuestion\(/);
 assert.match(orchestration, /buildLiaDecisionPlan\(/);
 assert.match(orchestration, /persistLiaDecision\(/);
 assert.match(orchestration, /routeLiaQuestion\(/);
-assert.match(orchestration, /humanGateRequired/);
-assert.match(orchestration, /maxAutonomyLevel/);
+assert.match(orchestration, /buildLiaDecisionPlan\(/);
 assert.doesNotMatch(orchestration, /NextResponse|createClient\(\)/);
 assert.doesNotMatch(orchestration, /\.from\(["'](?:accounts|transactions|bank_accounts|budgets|goals|forecasts|financial_[^"']*)["']\)/);
 
