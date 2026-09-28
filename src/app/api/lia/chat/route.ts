@@ -368,16 +368,45 @@ export async function POST(request: Request) {
 
   if (loopRunId && goalLifecycle) {
     try {
-      goalLifecycle = advanceGoalLifecycle(goalLifecycle, decision.decision === "research" ? "researching" : "planning", decision.decision === "research" ? "rechercher les informations externes nécessaires" : "préparer la résolution", { completedStep: "decision" });
-      await persistGoalLifecycle(supabase, loopRunId, goalLifecycle);
+      goalLifecycle = await updateLiaGoalState({
+        supabase,
+        loopRunId,
+        goalLifecycle,
+        state: decision.decision === "research" ? "researching" : "planning",
+        nextAction: decision.decision === "research" ? "rechercher les informations externes nécessaires" : "préparer la résolution",
+        details: { completedStep: "decision" },
+      });
     } catch (error) { console.warn("Impossible de mettre à jour l'état de l'objectif:", error instanceof Error ? error.message : error); }
   }
 
   if (decision.decision === "clarify") {
     const clarification = decision.clarification ?? "Peux-tu préciser ta demande ?";
-    if (loopRunId && goalLifecycle) { try { goalLifecycle = advanceGoalLifecycle(goalLifecycle, "needs_human", "répondre à la demande de précision", { completedStep: "understanding", blocker: clarification }); await persistGoalLifecycle(supabase, loopRunId, goalLifecycle); } catch {} }
+    if (loopRunId && goalLifecycle) {
+      try {
+        goalLifecycle = await updateLiaGoalState({
+          supabase,
+          loopRunId,
+          goalLifecycle,
+          state: "needs_human",
+          nextAction: "répondre à la demande de précision",
+          details: { completedStep: "understanding", blocker: clarification },
+        });
+      } catch {}
+    }
     if (cognitiveSession) {
-      try { await touchCognitiveSession(supabase, cognitiveSession.id, user.id, loopRunId, requestedQuestion, clarification); } catch {}
+      try {
+        await persistLiaSessionTurn({
+          supabase,
+          userId: user.id,
+          cognitiveSession,
+          loopRunId,
+          goalLifecycle,
+          sessionTurnIndex,
+          question: requestedQuestion,
+          answer: clarification,
+          decision: decision.decision,
+        });
+      } catch {}
     }
     return NextResponse.json({
       analysis: clarification,
@@ -476,8 +505,14 @@ export async function POST(request: Request) {
 
   if (loopRunId && goalLifecycle) {
     try {
-      goalLifecycle = advanceGoalLifecycle(goalLifecycle, research ? "researching" : "planning", research ? "évaluer les preuves acquises" : "raisonner avec le contexte disponible", { completedStep: research ? "research" : "context" });
-      await persistGoalLifecycle(supabase, loopRunId, goalLifecycle);
+      goalLifecycle = await updateLiaGoalState({
+        supabase,
+        loopRunId,
+        goalLifecycle,
+        state: research ? "researching" : "planning",
+        nextAction: research ? "évaluer les preuves acquises" : "raisonner avec le contexte disponible",
+        details: { completedStep: research ? "research" : "context" },
+      });
     } catch {}
   }
 
@@ -607,8 +642,14 @@ export async function POST(request: Request) {
 
   if (loopRunId && goalLifecycle) {
     try {
-      goalLifecycle = advanceGoalLifecycle(goalLifecycle, "evaluating", "vérifier la qualité, la sécurité et les preuves de la réponse", { completedStep: "execution" });
-      await persistGoalLifecycle(supabase, loopRunId, goalLifecycle);
+      goalLifecycle = await updateLiaGoalState({
+        supabase,
+        loopRunId,
+        goalLifecycle,
+        state: "evaluating",
+        nextAction: "vérifier la qualité, la sécurité et les preuves de la réponse",
+        details: { completedStep: "execution" },
+      });
     } catch {}
   }
 
@@ -781,8 +822,14 @@ export async function POST(request: Request) {
       // Keep the goal active for the bounded autonomous runner. The runner
       // performs the final deterministic observations/verification before
       // closing the lifecycle; the model never gets completion authority.
-      goalLifecycle = advanceGoalLifecycle(goalLifecycle, "evaluating", "exécuter la vérification autonome bornée avant de clôturer l'objectif", { completedStep: "evaluation_prepared", result: { model, recommendation_only: true } });
-      await persistGoalLifecycle(supabase, loopRunId, goalLifecycle);
+      goalLifecycle = await updateLiaGoalState({
+        supabase,
+        loopRunId,
+        goalLifecycle,
+        state: "evaluating",
+        nextAction: "exécuter la vérification autonome bornée avant de clôturer l'objectif",
+        details: { completedStep: "evaluation_prepared", result: { model, recommendation_only: true } },
+      });
     } catch {}
   }
 
