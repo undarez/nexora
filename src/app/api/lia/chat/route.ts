@@ -9,6 +9,7 @@ import { toolsForTask } from "@/lib/agent-runtime/executor";
 import { loadLiaFinancialContext } from "@/lib/lia/financial-context";
 import { runLiaCognitiveKernel } from "@/lib/lia/cognitive-kernel";
 import { handleLiaConversation } from "@/lib/lia/chat-conversation";
+import { routeLiaQuestion } from "@/lib/lia/decision-router";
 import { selectHumanLiaResponse } from "@/lib/lia/conversation";
 import { executeChatToolsWithHarness } from "@/lib/lia/chat-runtime";
 import { assertSameOrigin } from "@/lib/security/csrf";
