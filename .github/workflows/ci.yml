@@ -67,6 +67,9 @@ jobs:
       - name: Orchestration regression
         run: npm run lia:orchestration
 
+      - name: Session / goal orchestration regression
+        run: npm run lia:session-goal-orchestration
+
       - name: Verification / recovery regressions
         run: |
           npm run lia:verification-resume
