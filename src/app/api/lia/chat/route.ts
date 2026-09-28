@@ -31,7 +31,7 @@ import { runFinancialReasoning, formatFinancialReasoning } from "@/lib/lia/finan
 import { runRiskReasoning, formatRiskReasoning } from "@/lib/lia/risk-reasoning";
 import { runBudgetReasoning, formatBudgetReasoning } from "@/lib/lia/budget-reasoning";
 import { runFinancialOutlook, formatFinancialOutlook } from "@/lib/lia/prospective-reasoning";
-import { buildLiaRecommendation, formatLiaRecommendation } from "@/lib/lia/recommendation-engine";
+import { buildLiaRecommendationContext, formatLiaRecommendationContext } from "@/lib/lia/recommendation-orchestration";
 import { recordLiaGovernanceAudit } from "@/lib/lia/governance-audit";
 
 const TASKS = new Set<AgentTask>(["financial_analysis", "budget", "cashflow", "wealth"]);
@@ -522,7 +522,7 @@ export async function POST(request: Request) {
   const unifiedLoopPrompt = unifiedCognitiveLoop
     ? `\n\nNEXORA UNIFIED COGNITIVE LOOP (composition déterministe) :\n${JSON.stringify(summarizeUnifiedCognitiveLoop(unifiedCognitiveLoop))}\nRègle : cette composition coordonne les kernels mais n'accorde aucune autorisation. Policy Engine et Decision Gate restent souverains.`
     : "\n\nNEXORA UNIFIED COGNITIVE LOOP : indisponible pour ce tour ; utiliser les kernels individuels sans inventer de résultat.";
-  const recommendation = buildLiaRecommendation({
+  const recommendation = buildLiaRecommendationContext({
     objective: requestedQuestion,
     balance,
     income90d,
@@ -568,7 +568,7 @@ export async function POST(request: Request) {
     });
     analysis = deterministic.content;
     if (/recommand|que faire|priorit|conseil|devrais|devrait|propose|décision|decision|achat|épargne|epargne/i.test(requestedQuestion)) {
-      analysis += formatLiaRecommendation(recommendation);
+      analysis += formatLiaRecommendationContext(recommendation);
     }
     if (/pourquoi|evolu|augmente|diminue|baisse|hausse|anomal|derive|variation|compar|situation|tendance/i.test(requestedQuestion)) {
       analysis += formatFinancialReasoning(financialReasoning);
