@@ -119,7 +119,8 @@
     "lia:decision-plan": "node scripts/lia-decision-plan-regression.mjs",
     "lia:brain-context": "node scripts/lia-brain-context-regression.mjs",
     "lia:memory-knowledge": "node scripts/lia-memory-knowledge-regression.mjs",
-    "lia:recommendation": "node scripts/lia-recommendation-regression.mjs"
+    "lia:recommendation": "node scripts/lia-recommendation-regression.mjs",
+    "lia:research-evidence": "node scripts/lia-research-evidence-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",

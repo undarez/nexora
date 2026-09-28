@@ -77,6 +77,8 @@ jobs:
         run: npm run lia:memory-knowledge
       - name: Recommendation regression
         run: npm run lia:recommendation
+      - name: Research / evidence regression
+        run: npm run lia:research-evidence
 
       - name: Verification / recovery regressions
         run: |

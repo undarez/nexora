@@ -14,10 +14,10 @@ import { executeChatToolsWithHarness } from "@/lib/lia/chat-runtime";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { runCognitivePhase } from "@/lib/lia/cognitive-core";
 import { buildLiaExplainability } from "@/lib/lia/evidence-synthesis";
-import { runLiveResearch } from "@/lib/lia/research/live";
 import { compactMemoryContext } from "@/lib/lia/memory-context";
 import { loadLiaDurableMemory, proposeLiaMemoryFromTurn } from "@/lib/lia/memory-knowledge-orchestration";
 import { recordCognitiveOrchestration } from "@/lib/lia/cognitive-orchestrator";
+import { runLiaResearchEvidence } from "@/lib/lia/research-orchestration";
 import { lifecycleForResponse, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
 import type { LiaCognitiveSession } from "@/lib/lia/cognitive-session";
 import { initializeLiaSessionGoalState, createOrResumeLiaGoal, updateLiaGoalState, persistLiaSessionTurn, learnExplicitLiaRelationalFeedback } from "@/lib/lia/session-goal-orchestration";
@@ -411,19 +411,20 @@ export async function POST(request: Request) {
     });
   }
 
-  let research: Awaited<ReturnType<typeof runLiveResearch>> | null = null;
-  if (decision.externalResearch) {
-    try {
-      research = await runLiveResearch({ query: requestedQuestion, maxSources: 5, timeoutMs: 10000, discover: true });
-      if (loopRunId) {
-        await recordAgentLoopStep(supabase, loopRunId, 6, { phase: "context", agentKey: "lia:research", input: { requested: true, decision: decision.decision }, output: { provider: research.discovery.provider, status: research.discovery.status, evidence_count: research.evidence.length, contradictions: research.contradictions.length } });
-        for (const item of research.evidence.slice(0, 8)) {
-          await recordEvidence(supabase, loopRunId, "lia:research", "external_research_evidence", { claim: item.claim, source: item.source });
-        }
-      }
-    } catch (error) {
-      console.warn("Recherche externe LIA indisponible:", error instanceof Error ? error.message : error);
-    }
+  let research: Awaited<ReturnType<typeof runLiaResearchEvidence>>["research"] | null = null;
+  try {
+    const researchResult = await runLiaResearchEvidence({
+      supabase,
+      loopRunId,
+      requested: decision.externalResearch,
+      decision: decision.decision,
+      query: requestedQuestion,
+      maxSources: 5,
+      timeoutMs: 10000,
+    });
+    research = researchResult.research;
+  } catch (error) {
+    console.warn("Recherche externe LIA indisponible:", error instanceof Error ? error.message : error);
   }
 
   let unifiedCognitiveLoop: Awaited<ReturnType<typeof runUnifiedCognitiveLoop>> | null = null;
