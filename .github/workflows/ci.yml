@@ -75,6 +75,8 @@ jobs:
         run: npm run lia:brain-context
       - name: Memory / knowledge regression
         run: npm run lia:memory-knowledge
+      - name: Recommendation regression
+        run: npm run lia:recommendation
 
       - name: Verification / recovery regressions
         run: |
