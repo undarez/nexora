@@ -20,7 +20,8 @@ assert.doesNotMatch(route, /createGoalLifecycle\(/);
 assert.doesNotMatch(route, /await\s+recordExplicitRelationalFeedback\(/);
 assert.doesNotMatch(orchestration, /NextResponse|createClient\(\)|from\(["'](accounts|transactions|bank_accounts|financial)[^"']*["']\)/);
 
-assert.match(orchestration, /financialWriteAllowed|financial/);
+assert.doesNotMatch(orchestration, /financialWriteAllowed/);
+assert.doesNotMatch(orchestration, /\.from\(["'](?:accounts|transactions|bank_accounts|budgets|goals|forecasts|financial_[^"']*)["']\)/);
 assert.match(orchestration, /consentedPersonalization/);
 
 // Keep this assertion file intentionally structural: it protects the boundary without executing financial writes.\nconsole.log("PASS LIA session/goal orchestration boundary: route delegates lifecycle/session persistence and facade has no financial authority.");
