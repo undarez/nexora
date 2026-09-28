@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   createMemoryCandidate,
   retrieveLiaMemories,
-  type LiaMemory,
+  type LiaMemoryContext,
 } from "@/lib/lia/memory-context";
 import { recordFinancialMemoryVersion } from "@/lib/lia/financial-memory/pipeline";
 
@@ -10,7 +10,7 @@ export async function loadLiaDurableMemory(
   supabase: SupabaseClient,
   userId: string,
   query: string,
-): Promise<LiaMemory[]> {
+): Promise<LiaMemoryContext[]> {
   return retrieveLiaMemories(supabase, userId, query);
 }
 
