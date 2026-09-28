@@ -15,13 +15,14 @@ import { assertSameOrigin } from "@/lib/security/csrf";
 import { runCognitivePhase } from "@/lib/lia/cognitive-core";
 import { buildLiaExplainability } from "@/lib/lia/evidence-synthesis";
 import { runLiveResearch } from "@/lib/lia/research/live";
-import { compactMemoryContext, createMemoryCandidate, retrieveLiaMemories } from "@/lib/lia/memory-context";
+import { compactMemoryContext } from "@/lib/lia/memory-context";
+import { loadLiaDurableMemory, proposeLiaMemoryFromTurn } from "@/lib/lia/memory-knowledge-orchestration";
 import { recordCognitiveOrchestration } from "@/lib/lia/cognitive-orchestrator";
 import { lifecycleForResponse, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
 import type { LiaCognitiveSession } from "@/lib/lia/cognitive-session";
 import { initializeLiaSessionGoalState, createOrResumeLiaGoal, updateLiaGoalState, persistLiaSessionTurn, learnExplicitLiaRelationalFeedback } from "@/lib/lia/session-goal-orchestration";
 import { buildAndPersistLiaDecisionPlan } from "@/lib/lia/decision-plan-orchestration";
-import { compactBrainContext, recordFinancialBrainOutcome, recordFinancialMemoryVersion, recordLiaProductionTelemetry } from "@/lib/lia/financial-memory/pipeline";
+import { compactBrainContext, recordFinancialBrainOutcome, recordLiaProductionTelemetry } from "@/lib/lia/financial-memory/pipeline";
 import { loadLiaBrainContextForTurn } from "@/lib/lia/brain-context-orchestration";
 import { evaluateAndCorrectLiaResponse } from "@/lib/lia/self-evaluation";
 import { runUnifiedCognitiveLoop, summarizeUnifiedCognitiveLoop } from "@/lib/lia/unified-cognitive-loop";
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
   const since = new Date();
   since.setDate(since.getDate() - 90);
   const startedAt = Date.now();
-  const durableMemories = await retrieveLiaMemories(supabase, user.id, requestedQuestion);
+  const durableMemories = await loadLiaDurableMemory(supabase, user.id, requestedQuestion);
 
   let relationalContext: Record<string, unknown> | null = null;
   try {
@@ -689,16 +690,12 @@ export async function POST(request: Request) {
 
   if (loopRunId) {
     try {
-      const memoryCandidateId = await createMemoryCandidate(supabase, user.id, requestedQuestion, loopRunId);
-      if (memoryCandidateId) {
-        await recordFinancialMemoryVersion({
-          memoryId: String(memoryCandidateId),
-          content: { instruction: requestedQuestion.slice(0, 1200), source: "explicit_user_request", loop_run_id: loopRunId, activation_allowed: false },
-          status: "proposed",
-          reason: "explicit_user_request",
-          changedBy: "lia",
-        });
-      }
+      const { memoryCandidateId } = await proposeLiaMemoryFromTurn({
+        supabase,
+        userId: user.id,
+        query: requestedQuestion,
+        loopRunId,
+      });
       await runCognitivePhase({ supabase, loopRunId, stepOrder: 13, phase: "memorize", input: { accepted_memory_count: durableMemories.length }, output: { candidate_created: Boolean(memoryCandidateId), activation_allowed: false } });
       await recordEvidence(supabase, loopRunId, "lia-explainability", "evidence.synthesis", explainability as unknown as Record<string, unknown>);
       await runCognitivePhase({ supabase, loopRunId, stepOrder: 12, phase: "verify", input: { evidence_count: explainability.evidence.length }, output: { confidence: explainability.confidence, confidence_score: explainability.confidenceScore, limitations: explainability.limitations } });
