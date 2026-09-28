@@ -18,9 +18,9 @@ import { buildLiaExplainability } from "@/lib/lia/evidence-synthesis";
 import { runLiveResearch } from "@/lib/lia/research/live";
 import { compactMemoryContext, createMemoryCandidate, retrieveLiaMemories } from "@/lib/lia/memory-context";
 import { recordCognitiveOrchestration } from "@/lib/lia/cognitive-orchestrator";
-import { advanceGoalLifecycle, createGoalLifecycle, lifecycleForResponse, persistGoalLifecycle, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
-import { getOrCreateCognitiveSession, touchCognitiveSession, recordCognitiveSessionTurn, updateCognitiveSessionContext, type LiaCognitiveSession } from "@/lib/lia/cognitive-session";
-import { detectExplicitRelationalFeedback, recordExplicitRelationalFeedback } from "@/lib/lia/relational-learning";
+import { lifecycleForResponse, type LiaGoalLifecycle } from "@/lib/lia/goal-lifecycle";
+import type { LiaCognitiveSession } from "@/lib/lia/cognitive-session";
+import { initializeLiaSessionGoalState, createOrResumeLiaGoal, updateLiaGoalState, persistLiaSessionTurn, learnExplicitLiaRelationalFeedback } from "@/lib/lia/session-goal-orchestration";
 import { buildLiaDecisionPlan, persistLiaDecision } from "@/lib/lia/decision-engine";
 import { buildLiaBrainContext, compactBrainContext, recordFinancialBrainOutcome, recordFinancialMemoryVersion, recordLiaProductionTelemetry } from "@/lib/lia/financial-memory/pipeline";
 import { evaluateAndCorrectLiaResponse } from "@/lib/lia/self-evaluation";
@@ -89,21 +89,19 @@ export async function POST(request: Request) {
   let cognitiveSession: LiaCognitiveSession | null = null;
   let sessionParentLoopRunId: string | null = null;
   let sessionTurnIndex = 1;
-  try {
-    cognitiveSession = await getOrCreateCognitiveSession(supabase, user.id, requestedSessionId);
-    sessionParentLoopRunId = cognitiveSession.activeLoopRunId;
-    sessionTurnIndex = cognitiveSession.turnCount + 1;
-    if (!requestedLoopRunId && cognitiveSession.activeLoopRunId) requestedLoopRunId = cognitiveSession.activeLoopRunId;
-    // If the UI was refreshed, restore the last turn as bounded working context.
-    if (history.length === 0 && cognitiveSession.lastUserMessage) {
-      history = ([
-        { role: "user" as const, content: cognitiveSession.lastUserMessage.slice(0, 3000) },
-        ...(cognitiveSession.lastAssistantMessage ? [{ role: "assistant" as const, content: cognitiveSession.lastAssistantMessage.slice(0, 3000) }] : []),
-      ] as Array<{ role: "user" | "assistant"; content: string }>).slice(-8);
-    }
-  } catch (error) {
-    console.warn("Session cognitive indisponible; poursuite sans session:", error instanceof Error ? error.message : error);
-  }
+
+  const sessionState = await initializeLiaSessionGoalState({
+    supabase,
+    userId: user.id,
+    requestedSessionId,
+    requestedLoopRunId,
+    history,
+  });
+  cognitiveSession = sessionState.cognitiveSession;
+  requestedLoopRunId = sessionState.requestedLoopRunId;
+  sessionParentLoopRunId = sessionState.sessionParentLoopRunId;
+  sessionTurnIndex = sessionState.sessionTurnIndex;
+  history = sessionState.history;
   const since = new Date();
   since.setDate(since.getDate() - 90);
   const startedAt = Date.now();
