@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { liaChat } from "@/lib/lia/provider";
+import { runLiaModelResponse } from "@/lib/lia/model-response-runtime";
 import { deterministicLiaAnalysis } from "@/lib/lia/deterministic-engine";
 import { AGENT_TASK_LABELS, SUPERVISOR_PROMPT, TASK_PROMPTS, type AgentTask } from "@/lib/agents/prompts";
 import { runFinancialOrchestration } from "@/lib/agents/orchestrator";
@@ -9,7 +10,6 @@ import { toolsForTask } from "@/lib/agent-runtime/executor";
 import { loadLiaFinancialContext } from "@/lib/lia/financial-context";
 import { runLiaCognitiveKernel } from "@/lib/lia/cognitive-kernel";
 import { handleLiaConversation } from "@/lib/lia/chat-conversation";
-import { selectHumanLiaResponse } from "@/lib/lia/conversation";
 import { executeChatToolsWithHarness } from "@/lib/lia/chat-runtime";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { runCognitivePhase } from "@/lib/lia/cognitive-core";
@@ -580,25 +580,22 @@ export async function POST(request: Request) {
     model = deterministic.model;
     workers = [{ task, label: AGENT_TASK_LABELS[task], status: "completed", content: analysis, model, durationMs: 0 }];
 
-    // Optional generative enhancement remains deliberately opt-in. It can enrich
-    // answers when a provider is already available, but it is never required.
-    if (process.env.LIA_GENERATIVE_ENHANCEMENT !== "false") {
-      try {
-        const result = await liaChat([
-          { role: "system", content: SUPERVISOR_PROMPT },
-          { role: "system", content: `Mission active : ${AGENT_TASK_LABELS[task]}. Tu peux enrichir l'analyse déterministe, mais reste soumis au superviseur.` },
-          { role: "user", content: `${userPrompt}\n\nANALYSE DÉTERMINISTE DE BASE :\n${analysis}` },
-        ], AbortSignal.timeout(60000));
-        const safeGenerated = selectHumanLiaResponse(result.content, analysis);
-        analysis = safeGenerated.content;
-        model = safeGenerated.rejectedGenerated ? deterministic.model : result.model;
-        provider = safeGenerated.rejectedGenerated ? "deterministic" : result.provider;
-        providerUsage = result.usage ?? null;
-        workers = [{ task, label: AGENT_TASK_LABELS[task], status: "completed", content: analysis, model, durationMs: 0 }];
-      } catch (enhancementError) {
-        console.warn("Enrichissement génératif indisponible; conservation de l'analyse déterministe:", enhancementError instanceof Error ? enhancementError.message : enhancementError);
-      }
-    }
+    const modelResult = await runLiaModelResponse({
+      messages: [
+        { role: "system", content: SUPERVISOR_PROMPT },
+        { role: "system", content: `Mission active : ${AGENT_TASK_LABELS[task]}. Tu peux enrichir l'analyse déterministe, mais reste soumis au superviseur.` },
+        { role: "user", content: `${userPrompt}\n\nANALYSE DÉTERMINISTE DE BASE :\n${analysis}` },
+      ],
+      fallback: analysis,
+      deterministicModel: deterministic.model,
+      enabled: process.env.LIA_GENERATIVE_ENHANCEMENT !== "false",
+      timeoutMs: 60000,
+    });
+    analysis = modelResult.content;
+    model = modelResult.model;
+    provider = modelResult.provider;
+    providerUsage = modelResult.usage;
+    workers = [{ task, label: AGENT_TASK_LABELS[task], status: "completed", content: analysis, model, durationMs: modelResult.durationMs }];
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur du moteur LIA.";
     if (loopRunId) {

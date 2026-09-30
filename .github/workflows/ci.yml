@@ -79,6 +79,8 @@ jobs:
         run: npm run lia:recommendation
       - name: Research / evidence regression
         run: npm run lia:research-evidence
+      - name: Model / response runtime regression
+        run: npm run lia:model-response-runtime
 
       - name: Verification / recovery regressions
         run: |
