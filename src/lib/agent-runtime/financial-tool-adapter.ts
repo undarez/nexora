@@ -95,3 +95,14 @@ export async function executeFinancialAgentTool(
       return { handled: false };
   }
 }
+
+
+/** Domain-owned tool selection for the financial chat route. */
+export function toolsForFinancialTask(task: string) {
+  switch (task) {
+    case "budget": return ["get_budget_status", "get_cashflow"] as const;
+    case "cashflow": return ["get_cashflow", "get_financial_snapshot"] as const;
+    case "wealth": return ["get_wealth_snapshot", "get_financial_snapshot"] as const;
+    default: return ["get_financial_snapshot", "get_budget_status", "get_cashflow", "get_wealth_snapshot", "get_forecast"] as const;
+  }
+}
