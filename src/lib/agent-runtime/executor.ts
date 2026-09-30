@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createHash } from "node:crypto";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { getAgentTool } from "./tool-registry";
 import { authorizeAgentTool, getLiaPrincipal } from "@/lib/security/agent-identity";
@@ -11,7 +10,7 @@ import { searchLiaUseCases, buildUseCaseCandidate } from "@/lib/lia/use-cases/re
 import { runLiveResearch } from "@/lib/lia/research/live";
 import { getLiaRuntimeControls } from "@/lib/lia/runtime/controls";
 import { assessPreAction } from "@/lib/lia/pre-action-monitor";
-import { executeFinancialAgentTool } from "./financial-tool-adapter";
+import { executeFinancialAgentTool, getFinancialAgentTool } from "./financial-tool-adapter";
 
 export type ToolCall = { name: string; arguments?: Record<string, unknown> };
 
@@ -38,7 +37,7 @@ export async function executeAgentTool(
   const policyReason = dbDecision?.reason ?? "policy_denied";
   if (!dbDecision?.allowed) await recordFinancialBehaviourEvent({ runId: governanceContext?.runId, stepId: governanceContext?.stepId, eventType: policyReason === "human_approval_required" ? "approval_request" : "policy_block", severity: policyReason === "human_approval_required" ? "warning" : "high", metadata: { tool: call.name, reason: policyReason } });
   if (!dbDecision?.allowed && policyReason !== "human_approval_required") throw new Error(`Policy agent refusée par Supabase : ${policyReason}`);
-  const definition = getAgentTool(call.name);
+  const definition = getAgentTool(call.name) ?? getFinancialAgentTool(call.name);
   if (!definition) throw new Error(`Outil agentique inconnu : ${call.name}`);
   const preAction = assessPreAction({
     tool: call.name,
@@ -63,7 +62,7 @@ export async function executeAgentTool(
   if (gate?.outcome === "REQUIRE_APPROVAL" && policyReason !== "human_approval_required") throw new Error(`Decision Gate : validation humaine requise (${call.name}).`);
   if (definition.risk === "write-sensitive") throw new Error(`Outil sensible bloqué sans validation humaine : ${call.name}`);
   const args = call.arguments ?? {};
-  const financialTool = await executeFinancialAgentTool(supabase, userId, call.name, args);
+  const financialTool = await executeFinancialAgentTool(supabase, userId, call.name, args, { admin, agentId: principal.agentId, autonomyLevel });
   if (financialTool.handled) return financialTool.result;
 
   switch (call.name) {
@@ -97,7 +96,6 @@ export async function executeAgentTool(
       if (error) throw new Error(`Impossible de mémoriser le skill : ${error.message}`); return { skill_id:data, status:"candidate", activation:"blocked_until_validation", memory_gate:candidate.memoryGate };
     }
     case "create_recommendation": { const title = typeof args.title === "string" ? args.title.slice(0,200) : "Recommandation IA"; const body = typeof args.body === "string" ? args.body.slice(0,10000) : ""; if (!body) throw new Error("Une recommandation doit contenir un contenu."); const { data, error } = await admin.from("lia_action_proposals").insert({ user_id:userId, agent_id:principal.agentId, action_key:"create_recommendation", title, description:body, risk_class:"recommendation", autonomy_level:autonomyLevel, reversible:true, payload:{ title, body }, rollback_payload:{ action:"delete_recommendation_by_proposal" }, status:"proposed", expires_at:new Date(Date.now()+15*60*1000).toISOString() }).select("id,created_at,status").single(); if (error) throw new Error(`Impossible de créer la proposition : ${error.message}`); return { proposal_id:data.id, created_at:data.created_at, status:data.status, requires_human_approval:true }; }
-    case "save_financial_insight": { const title = typeof args.title === "string" ? args.title.slice(0, 200) : "Observation financière"; const body = typeof args.body === "string" ? args.body.slice(0, 5000) : ""; if (!body) throw new Error("Une observation financière doit contenir un contenu."); if (autonomyLevel < 3) throw new Error("Cette action nécessite L3."); const executionKey = createHash("sha256").update(`insight:${userId}:${principal.agentId}:${title}:${body}`).digest("hex").slice(0, 48); const { data: existing } = await admin.from("lia_action_proposals").select("id,status").eq("user_id", userId).eq("execution_key", executionKey).maybeSingle(); if (existing) return { status:"already_executed", execution_key:executionKey, proposal_id:existing.id }; const { data, error } = await admin.from("lia_action_proposals").insert({ user_id:userId, agent_id:principal.agentId, action_key:"save_financial_insight", title, description:body, risk_class:"recommendation", autonomy_level:autonomyLevel, reversible:true, payload:{title,body}, rollback_payload:{action:"delete_proposal",execution_key:executionKey}, status:"executed", executed_at:new Date().toISOString(), execution_key:executionKey }).select("id,title,description,status,execution_key,executed_at").single(); if (error) throw new Error(error.message); await admin.from("lia_action_audit").insert({proposal_id:data.id,user_id:userId,agent_id:principal.agentId,event:"insight_saved",actor:"lia_l3",metadata:{execution_key:executionKey,reversible:true,autonomy_level:autonomyLevel}}); return { ...data, reversible:true, autonomous:true, autonomy_level:autonomyLevel }; }
     default: throw new Error(`Outil non implémenté : ${call.name}`);
   }
 }
