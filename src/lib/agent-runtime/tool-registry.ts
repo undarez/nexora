@@ -1,4 +1,5 @@
 import type { AgentToolDefinition } from "./tool-definition";
+export type { AgentToolDefinition } from "./tool-definition";
 
 export const AGENT_TOOLS: AgentToolDefinition[] = [
   { name: "search_use_cases", description: "Rechercher les Use Cases métier adaptés à l’objectif.", risk: "read", deterministic: true, requiresUserApproval: false },
