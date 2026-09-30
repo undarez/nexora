@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { getAgentTool } from "./tool-registry";
-import { authorizeAgentTool, getLiaPrincipal } from "@/lib/security/agent-identity";
+import { authorizeAgentExecution, getLiaPrincipal } from "@/lib/security/agent-identity";
 import { clampAutonomy, type AutonomyLevel } from "@/lib/security/autonomy";
 import { searchLiaSkills } from "@/lib/lia/skills/registry";
 import { recordDecisionGate } from "@/lib/lia/financial-memory/governance";
@@ -24,8 +24,8 @@ export async function executeAgentTool(
   const { data: autonomyData, error: autonomyError } = await supabase.rpc("get_lia_autonomy", { p_user_id: userId });
   if (autonomyError) throw new Error(`Autonomie LIA indisponible : ${autonomyError.message}`);
   const autonomyLevel = clampAutonomy(autonomyData, 1);
-  const localAuthorization = authorizeAgentTool(principal, call.name, autonomyLevel);
-  if (!localAuthorization.allowed && localAuthorization.reason !== "human_approval_required") throw new Error(`Policy agent refusée : ${localAuthorization.reason}`);
+  const localAuthorization = authorizeAgentExecution(principal, autonomyLevel);
+  if (!localAuthorization.allowed) throw new Error(`Identité agent refusée : ${localAuthorization.reason}`);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secret = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !secret) throw new Error("Policy Engine Supabase indisponible : configuration serveur manquante.");
