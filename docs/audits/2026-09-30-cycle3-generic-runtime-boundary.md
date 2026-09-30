@@ -47,4 +47,4 @@ La régression Cycle 3 a été transformée en garde-fou structurel : toute réi
 
 ## Gate
 
-Cycle 3 — première correction de frontière : IMPLEMENTED. La séparation n'est pas encore considérée comme complète : le prochain audit doit vérifier les autres dépendances financières du runtime générique, notamment `toolsForTask`, les types de tâches et les éventuels chemins de persistance.
+Cycle 3 — première correction de frontière : IMPLEMENTED. Un contrôle complémentaire a confirmé que `toolsForTask` restait une sélection de capacités financières directement codée dans le runtime générique ; cette fonction et le fichier temporaire `toolsForTask.tmp` sont traités comme dette de couplage à supprimer.
