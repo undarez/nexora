@@ -39,6 +39,12 @@ Le prochain changement doit :
 - conserver les mêmes Decision Gates, permissions, audits et validations humaines ;
 - ajouter une régression qui interdit toute dépendance financière directe dans le cœur générique.
 
+## Correction appliquée
+
+Le handler financier a été extrait vers `src/lib/agent-runtime/financial-tool-adapter.ts`. Le generic executor conserve la gouvernance et le dispatch, puis délègue les outils financiers à cet adaptateur. Il ne dépend plus directement de `financial-data-gateway` et ne contient plus les handlers financiers.
+
+La régression Cycle 3 a été transformée en garde-fou structurel : toute réintroduction d'un handler financier direct dans l'executor générique doit faire échouer le test.
+
 ## Gate
 
-Cycle 3 : audit initial terminé, correction de frontière requise avant de considérer la séparation générique comme acquise.
+Cycle 3 — première correction de frontière : IMPLEMENTED. La séparation n'est pas encore considérée comme complète : le prochain audit doit vérifier les autres dépendances financières du runtime générique, notamment `toolsForTask`, les types de tâches et les éventuels chemins de persistance.
