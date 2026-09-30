@@ -10,6 +10,7 @@ const files = {
   cron: await readFile("src/app/api/lia/runtime/cron/route.ts", "utf8"),
   autoCron: await readFile("src/lib/lia/runtime/auto-cron.ts", "utf8"),
   vercel: await readFile("vercel.json", "utf8"),
+  scheduler: await readFile("supabase/migrations/20260930090000_lia_runtime_supabase_cron.sql", "utf8"),
 };
 
 const checks = [
@@ -24,7 +25,9 @@ const checks = [
   ["runtime endpoint uses cron secret", files.route.includes("LIA_CRON_SECRET") && files.route.includes("CRON_SECRET")],
   ["cron dispatches continuous operation", files.cron.includes("continuous_operations") && files.cron.includes("runLiaContinuousCycle")],
   ["auto-cron provisions continuous operation", files.autoCron.includes("continuous_operations") && files.autoCron.includes("0 20 * * *") && files.autoCron.includes('timezone: "Europe/Paris"')],
-  ["vercel dispatches LIA runtime hourly", files.vercel.includes('"path": "/api/lia/runtime/cron"') && files.vercel.includes('"schedule": "0 * * * *"')],
+  ["vercel keeps only the daily verification cron", !files.vercel.includes('"path": "/api/lia/runtime/cron"') && files.vercel.includes('"path": "/api/lia/runtime/p4-verify"') && files.vercel.includes('"schedule": "0 21 * * *"')],
+  ["supabase schedules LIA runtime hourly", files.scheduler.includes("cron.schedule") && files.scheduler.includes("'lia-runtime-hourly'") && files.scheduler.includes("'0 * * * *'")],
+  ["supabase scheduler uses Vault secrets", files.scheduler.includes("lia_runtime_url") && files.scheduler.includes("lia_runtime_cron_secret") && files.scheduler.includes("vault.decrypted_secrets")],
   ["continuous operation is explicitly bounded", files.engine.includes("continuousOperationBudget")],
   ["adaptive autonomy uses historical reliability", files.autonomy.includes("historicalReliability") && files.runtime.includes("historicalReliability")],
   ["executor derives reliability from specialist history", files.executor.includes("lia_specialist_runs") && files.executor.includes("loadHistoricalReliability")],
