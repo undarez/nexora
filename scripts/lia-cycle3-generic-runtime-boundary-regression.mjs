@@ -17,5 +17,6 @@ assert.match(adapter, /case "get_financial_snapshot"/, "financial adapter must o
 assert.match(adapter, /case "get_budget_status"/, "financial adapter must own budget access");
 assert.match(adapter, /case "get_cashflow"/, "financial adapter must own cashflow access");
 assert.match(adapter, /case "get_wealth_snapshot"/, "financial adapter must own wealth access");
+assert.doesNotMatch(executor, /export function toolsForTask/, "generic executor must not expose domain-specific financial task selection");
 
 console.log("PASS Cycle 3: generic executor is decoupled from direct financial tool handlers");
