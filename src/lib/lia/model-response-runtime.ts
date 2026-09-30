@@ -13,7 +13,7 @@ export type LiaModelResponseResult = {
   content: string;
   model: string;
   provider: LiaProviderResult["provider"];
-  usage: LiaProviderResult["usage"] | null;
+  usage: NonNullable<LiaProviderResult["usage"]> | null;
   rejectedGenerated: boolean;
   durationMs: number;
 };
