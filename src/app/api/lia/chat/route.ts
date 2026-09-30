@@ -6,7 +6,7 @@ import { deterministicLiaAnalysis } from "@/lib/lia/deterministic-engine";
 import { AGENT_TASK_LABELS, SUPERVISOR_PROMPT, TASK_PROMPTS, type AgentTask } from "@/lib/agents/prompts";
 import { runFinancialOrchestration } from "@/lib/agents/orchestrator";
 import { finishAgentLoop, recordAgentLoopStep, recordEvidence, startAgentLoop } from "@/lib/agents/loop-engine";
-import { toolsForTask } from "@/lib/agent-runtime/executor";
+import { toolsForFinancialTask } from "@/lib/agent-runtime/financial-tool-adapter";
 import { loadLiaFinancialContext } from "@/lib/lia/financial-context";
 import { runLiaCognitiveKernel } from "@/lib/lia/cognitive-kernel";
 import { handleLiaConversation } from "@/lib/lia/chat-conversation";
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
     })),
   });
 
-  const toolNames = toolsForTask(task);
+  const toolNames = toolsForFinancialTask(task);
   const toolExecution = await executeChatToolsWithHarness(supabase, user.id, toolNames, loopRunId);
   const toolResults = toolExecution.results;
 
