@@ -15,12 +15,23 @@
 
 ## Status
 
-- Cycle: 1 — Cadrage
-- Overall: IN PROGRESS
+- Cycle: 2 — Stabilisation
+- Overall: BASELINE ESTABLISHED
 - PC-local control: EXCLUDED
 - Stream Deck: EXCLUDED
-- Current architectural audit: continuing
+- Current architectural extraction sequence: completed through model/response runtime
+- Current main baseline: 6bbd07f324ab8a39d887691416cee083690cd1c8
+
+## Cycle 2 evidence
+
+- PR #53 model/response runtime: merged and validated.
+- LIA conversation/chat runtime extraction: present on main.
+- LIA financial context extraction: present on main.
+- Cognitive/session/goal/brain/memory/recommendation/research orchestration extractions: present on main.
+- CI/typecheck/build/regression validation: passed on the post-merge baseline.
+- Vercel runtime dispatch: hourly LIA runtime cron remains configured; P4 verification remains daily.
+- No financial permission boundary was removed by Cycle 2 stabilisation.
 
 ## Gate
 
-Cycle 1 → Cycle 2 when all Cycle 1 deliverables are present, reviewed and internally consistent.
+Cycle 2 → Cycle 3 when the stabilisation evidence is recorded and main remains green.
