@@ -3,7 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createMcpHandler, OAuthError, OAuthErrorCode, requireBearerAuth } from "@modelcontextprotocol/server";
 import { createNexoraMcpServer } from "@/lib/mcp/nexora-server";
 import { getLiaPrincipal } from "@/lib/security/agent-identity";
-import { verifyNanobotExecutionContext } from "@/lib/security/nanobot-execution-context";
+import { verifyNanobotExecutionContext, type NanobotExecutionContext } from "@/lib/security/nanobot-execution-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,7 +67,7 @@ const handler = createMcpHandler(
     if (!userId) throw new Error("mcp_identity_missing");
 
     const isNanobot = authInfo?.extra?.nanobot === true;
-    const executionContext = isNanobot ? authInfo.extra?.executionContext : null;
+    const executionContext = isNanobot ? authInfo.extra?.executionContext as NanobotExecutionContext | undefined : null;
 
     if (isNanobot && (!executionContext || executionContext.userId !== userId)) {
       throw new Error("nanobot_identity_mismatch");
