@@ -1,6 +1,5 @@
 import type { AgentToolDefinition } from "@/lib/agent-runtime/tool-registry";
 import { clampAutonomy, type AutonomyLevel } from "@/lib/security/autonomy";
-import { getAgentPolicy } from "@/lib/security/agent-identity";
 
 /**
  * Maps the configured autonomy ceiling to capabilities the autonomous runtime
@@ -15,12 +14,7 @@ export function autonomousToolSet(
   const blocked: Array<{ name: string; reason: string }> = [];
 
   for (const tool of tools) {
-    const policy = getAgentPolicy(tool.name);
-    if (!policy) {
-      blocked.push({ name: tool.name, reason: "tool_policy_missing" });
-      continue;
-    }
-    if (tool.risk === "read" && level >= policy.minAutonomy) {
+    if (tool.risk === "read") {
       allowed.push(tool.name);
       continue;
     }
@@ -29,17 +23,17 @@ export function autonomousToolSet(
       continue;
     }
     const validatedLearningTool = tool.name === "learn_use_case" || tool.name === "learn_skill";
-    if (validatedLearningTool && level >= 7 && level >= policy.minAutonomy) {
+    if (validatedLearningTool && level >= 7) {
       allowed.push(tool.name);
       continue;
     }
-    if (tool.risk === "recommendation" && !validatedLearningTool && level >= policy.minAutonomy && level >= 3) {
+    if (tool.risk === "recommendation" && !validatedLearningTool && level >= 3) {
       allowed.push(tool.name);
       continue;
     }
     blocked.push({
       name: tool.name,
-      reason: validatedLearningTool ? "validated_learning_requires_L7" : tool.risk === "recommendation" ? `autonomy_level_requires_L${Math.max(3, policy.minAutonomy)}` : "non_autonomous_risk_class",
+      reason: validatedLearningTool ? "validated_learning_requires_L7" : tool.risk === "recommendation" ? `autonomy_level_requires_L3` : "non_autonomous_risk_class",
     });
   }
   return { level, tools: [...new Set(allowed)], blocked };
