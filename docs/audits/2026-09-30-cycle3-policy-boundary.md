@@ -65,6 +65,12 @@ The guard verifies that:
 - the executor uses the generic guard;
 - the executor still calls the Supabase authorization RPC with the requested tool key.
 
+## Build regression found and corrected
+
+The first deployment of this boundary refactor exposed a consumer dependency in `src/lib/lia/autonomy/bounded-engine.ts`, which still imported the removed `getAgentPolicy` helper. That helper was part of the old per-tool local policy registry and therefore could not be restored without reintroducing the architectural coupling.
+
+The bounded autonomy selector was corrected to use the tool definition risk/approval metadata only as a capability preselection. Final authorization remains in `executeAgentTool` through the Supabase Policy Engine. A regression assertion now prevents `bounded-engine.ts` from importing the removed policy registry.
+
 ## Remaining point to audit
 
 The next security/runtime audit should verify that tool definitions, policy rows, and execution adapters cannot diverge silently. In particular, a policy-enabled tool should have a resolvable definition before execution, and a tool definition should not imply authorization by itself.
