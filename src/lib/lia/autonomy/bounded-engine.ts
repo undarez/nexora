@@ -33,7 +33,7 @@ export function autonomousToolSet(
     }
     blocked.push({
       name: tool.name,
-      reason: validatedLearningTool ? "validated_learning_requires_L7" : tool.risk === "recommendation" ? `autonomy_level_requires_L${Math.max(3, policy.minAutonomy)}` : "non_autonomous_risk_class",
+      reason: validatedLearningTool ? "validated_learning_requires_L7" : tool.risk === "recommendation" ? `autonomy_level_requires_L3` : "non_autonomous_risk_class",
     });
   }
   return { level, tools: [...new Set(allowed)], blocked };
