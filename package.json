@@ -121,7 +121,8 @@
     "lia:memory-knowledge": "node scripts/lia-memory-knowledge-regression.mjs",
     "lia:recommendation": "node scripts/lia-recommendation-regression.mjs",
     "lia:research-evidence": "node scripts/lia-research-evidence-regression.mjs",
-    "lia:model-response-runtime": "node scripts/lia-model-response-runtime-regression.mjs"
+    "lia:model-response-runtime": "node scripts/lia-model-response-runtime-regression.mjs",
+    "lia:nanobot-compatibility": "node scripts/lia-nanobot-compatibility-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",
