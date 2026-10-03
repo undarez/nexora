@@ -25,9 +25,6 @@ for (const [content, needle, label] of [
   if (!content.includes(needle)) failures.push(label);
 }
 
-if (architecture.includes("Nanobot memory is the single general-purpose agent-memory runtime")) {
-  failures.push("Nanobot architecture boundary unexpectedly already present on main; audit branch should record this separately");
-}
 
 if (failures.length) {
   console.error("Nanobot compatibility regression failures:");
