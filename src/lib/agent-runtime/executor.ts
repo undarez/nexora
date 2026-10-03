@@ -18,12 +18,15 @@ export async function executeAgentTool(
   supabase: SupabaseClient,
   userId: string,
   call: ToolCall,
-  governanceContext?: { runId?: string | null; stepId?: string | null; knowledgeIds?: string[]; evidenceIds?: string[] },
+  governanceContext?: { goalId?: string | null; runId?: string | null; stepId?: string | null; sessionId?: string | null; knowledgeIds?: string[]; evidenceIds?: string[]; autonomyCeiling?: number | null },
 ) {
   const principal = getLiaPrincipal(userId);
   const { data: autonomyData, error: autonomyError } = await supabase.rpc("get_lia_autonomy", { p_user_id: userId });
   if (autonomyError) throw new Error(`Autonomie LIA indisponible : ${autonomyError.message}`);
-  const autonomyLevel = clampAutonomy(autonomyData, 1);
+  const configuredAutonomyLevel = clampAutonomy(autonomyData, 1);
+  const autonomyCeiling = governanceContext?.autonomyCeiling;
+  if (autonomyCeiling !== undefined && autonomyCeiling !== null && (!Number.isInteger(autonomyCeiling) || autonomyCeiling < 0 || autonomyCeiling > 8)) throw new Error("nanobot_autonomy_context_invalid");
+  const autonomyLevel = autonomyCeiling === undefined || autonomyCeiling === null ? configuredAutonomyLevel : Math.min(configuredAutonomyLevel, autonomyCeiling);
   const localAuthorization = authorizeAgentExecution(principal, autonomyLevel);
   if (!localAuthorization.allowed) throw new Error(`Identité agent refusée : ${localAuthorization.reason}`);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -57,7 +60,7 @@ export async function executeAgentTool(
   // REQUIRE_APPROVAL is recorded here; the existing Policy Engine and Decision Gate remain the authority for approval.
 
   const riskLevel = definition.risk === "write-sensitive" ? "high" : definition.risk === "recommendation" ? "medium" : "low";
-  const gate = await recordDecisionGate({ runId: governanceContext?.runId, stepId: governanceContext?.stepId, actionType: call.name, riskLevel, reversible: definition.risk !== "write-sensitive", authorizationPresent: Boolean(dbDecision?.allowed || policyReason === "human_approval_required"), policyId: dbDecision?.policy_id ?? dbDecision?.policyId ?? null, knowledgeIds: governanceContext?.knowledgeIds, evidenceIds: governanceContext?.evidenceIds, rationale: { policy_reason: policyReason, local_authorization: localAuthorization.allowed, knowledge_is_not_authorization: true } });
+  const gate = await recordDecisionGate({ runId: governanceContext?.runId, stepId: governanceContext?.stepId, actionType: call.name, riskLevel, reversible: definition.risk !== "write-sensitive", authorizationPresent: Boolean(dbDecision?.allowed || policyReason === "human_approval_required"), policyId: dbDecision?.policy_id ?? dbDecision?.policyId ?? null, knowledgeIds: governanceContext?.knowledgeIds, evidenceIds: governanceContext?.evidenceIds, rationale: { policy_reason: policyReason, local_authorization: localAuthorization.allowed, knowledge_is_not_authorization: true, goal_id: governanceContext?.goalId ?? null, session_id: governanceContext?.sessionId ?? null, delegated_autonomy_ceiling: autonomyCeiling ?? null } });
   if (gate?.outcome === "BLOCK") throw new Error(`Decision Gate : action bloquée (${call.name}).`);
   if (gate?.outcome === "REQUIRE_APPROVAL" && policyReason !== "human_approval_required") throw new Error(`Decision Gate : validation humaine requise (${call.name}).`);
   if (definition.risk === "write-sensitive") throw new Error(`Outil sensible bloqué sans validation humaine : ${call.name}`);
