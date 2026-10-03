@@ -4,11 +4,11 @@ import * as z from "zod/v4";
 import { executeAgentTool } from "@/lib/agent-runtime/executor";
 import { getLiaRuntimeControls } from "@/lib/lia/runtime/controls";
 
-export async function createNexoraMcpServer(supabase: SupabaseClient, userId: string) {
+export async function createNexoraMcpServer(\n  supabase: SupabaseClient,\n  userId: string,\n  executionContext?: { goalId?: string | null; runId?: string | null; sessionId?: string | null; autonomyCeiling?: number | null },\n) {
   const controls = await getLiaRuntimeControls(supabase);
   if (!controls.ai_enabled) throw new Error("lia_disabled");
   const server = new McpServer({ name: "nexora-lia", title: "NEXORA LIA", version: "1.0.0", description: "NEXORA finance agent tool gateway. All actions remain subject to NEXORA policy, autonomy and decision gates." }, { capabilities: { tools: {} } });
-  const call = async (name: string, args: Record<string, unknown>) => { const result = await executeAgentTool(supabase, userId, { name, arguments: args }); return { content: [{ type: "text" as const, text: JSON.stringify(result) }], structuredContent: result }; };
+  const call = async (name: string, args: Record<string, unknown>) => { const result = await executeAgentTool(supabase, userId, { name, arguments: args }, executionContext); return { content: [{ type: "text" as const, text: JSON.stringify(result) }], structuredContent: result }; };
   server.registerTool("get_financial_snapshot", { title: "Lire le snapshot financier", description: "Retourne un résumé financier non sensible et sans données de coffre.", _meta: { securitySchemes: [{ type: "oauth2", scopes: ["mcp"] }] }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async () => call("get_financial_snapshot", {}));
   server.registerTool("get_budget_status", { title: "Lire les budgets", description: "Retourne les budgets récents et leur état réel.", _meta: { securitySchemes: [{ type: "oauth2", scopes: ["mcp"] }] }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async () => call("get_budget_status", {}));
   server.registerTool("get_cashflow", { title: "Lire le cash-flow", description: "Calcule les flux observés sur une période bornée.", inputSchema: { days: z.number().int().min(1).max(365).optional() }, _meta: { securitySchemes: [{ type: "oauth2", scopes: ["mcp"] }] }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async ({ days }) => call("get_cashflow", { days: days ?? 90 }));
