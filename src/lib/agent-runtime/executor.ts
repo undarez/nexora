@@ -23,7 +23,10 @@ export async function executeAgentTool(
   const principal = getLiaPrincipal(userId);
   const { data: autonomyData, error: autonomyError } = await supabase.rpc("get_lia_autonomy", { p_user_id: userId });
   if (autonomyError) throw new Error(`Autonomie LIA indisponible : ${autonomyError.message}`);
-  const configuredAutonomyLevel = clampAutonomy(autonomyData, 1);\n  const autonomyCeiling = governanceContext?.autonomyCeiling;\n  if (autonomyCeiling !== undefined && autonomyCeiling !== null && (!Number.isInteger(autonomyCeiling) || autonomyCeiling < 0 || autonomyCeiling > 8)) throw new Error("nanobot_autonomy_context_invalid");\n  const autonomyLevel = autonomyCeiling === undefined || autonomyCeiling === null ? configuredAutonomyLevel : Math.min(configuredAutonomyLevel, autonomyCeiling);
+  const configuredAutonomyLevel = clampAutonomy(autonomyData, 1);
+  const autonomyCeiling = governanceContext?.autonomyCeiling;
+  if (autonomyCeiling !== undefined && autonomyCeiling !== null && (!Number.isInteger(autonomyCeiling) || autonomyCeiling < 0 || autonomyCeiling > 8)) throw new Error("nanobot_autonomy_context_invalid");
+  const autonomyLevel = autonomyCeiling === undefined || autonomyCeiling === null ? configuredAutonomyLevel : Math.min(configuredAutonomyLevel, autonomyCeiling);
   const localAuthorization = authorizeAgentExecution(principal, autonomyLevel);
   if (!localAuthorization.allowed) throw new Error(`Identité agent refusée : ${localAuthorization.reason}`);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
