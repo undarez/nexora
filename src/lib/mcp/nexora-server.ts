@@ -4,7 +4,11 @@ import * as z from "zod/v4";
 import { executeAgentTool } from "@/lib/agent-runtime/executor";
 import { getLiaRuntimeControls } from "@/lib/lia/runtime/controls";
 
-export async function createNexoraMcpServer(\n  supabase: SupabaseClient,\n  userId: string,\n  executionContext?: { goalId?: string | null; runId?: string | null; sessionId?: string | null; autonomyCeiling?: number | null },\n) {
+export async function createNexoraMcpServer(
+  supabase: SupabaseClient,
+  userId: string,
+  executionContext?: { goalId?: string | null; runId?: string | null; sessionId?: string | null; autonomyCeiling?: number | null },
+) {
   const controls = await getLiaRuntimeControls(supabase);
   if (!controls.ai_enabled) throw new Error("lia_disabled");
   const server = new McpServer({ name: "nexora-lia", title: "NEXORA LIA", version: "1.0.0", description: "NEXORA finance agent tool gateway. All actions remain subject to NEXORA policy, autonomy and decision gates." }, { capabilities: { tools: {} } });
