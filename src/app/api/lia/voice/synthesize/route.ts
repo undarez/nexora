@@ -6,7 +6,7 @@ import { synthesizeVoice, type VoiceProvider } from "@/lib/lia/voice/gateway";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const providers = new Set<VoiceProvider>(["hume", "elevenlabs"]);
+const providers = new Set<VoiceProvider>(["fish", "hume", "elevenlabs"]);
 
 export async function POST(request: Request) {
   try {
