@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { NanobotWorker } from "@/lib/security/nanobot-worker-registry";
 
 export type NanobotChatResult = {
   content: string;
@@ -15,16 +16,14 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_RESPONSE_BYTES = 2_000_000;
 
 function config() {
-  const baseUrl = process.env.NANOBOT_API_URL?.trim().replace(/\/$/, "");
   const apiKey = process.env.NANOBOT_API_KEY?.trim();
-  if (!baseUrl) throw new Error("nanobot_api_url_missing");
   if (!apiKey) throw new Error("nanobot_api_key_missing");
-  return { baseUrl, apiKey };
+  return { apiKey };
 }
 
 function fallback(requestId: string, sessionId: string, errorCode: string): NanobotChatResult {
   return {
-    content: "Nanobot est momentanément indisponible. NEXORA conserve le contrôle de LIA et peut poursuivre via son runtime natif.",
+    content: "Le worker Nanobot isolé est momentanément indisponible. NEXORA conserve le contrôle de LIA et peut poursuivre via son runtime natif.",
     model: null,
     usage: null,
     requestId,
@@ -41,18 +40,36 @@ function responseText(payload: unknown) {
   return typeof content === "string" ? content.slice(0, 100_000) : "";
 }
 
+function resolveWorkerEndpoint(worker: NanobotWorker | null) {
+  if (worker?.endpointUrl) return worker.endpointUrl.replace(/\/$/, "");
+  if (process.env.NODE_ENV !== "production" && process.env.NANOBOT_ALLOW_SHARED_RUNTIME === "true") {
+    const baseUrl = process.env.NANOBOT_API_URL?.trim().replace(/\/$/, "");
+    if (baseUrl) return baseUrl;
+  }
+  throw new Error("nanobot_worker_unavailable");
+}
+
 export async function runNanobotChat(input: {
   message: string;
   sessionId: string;
+  worker?: NanobotWorker | null;
   timeoutMs?: number;
   allowFallback?: boolean;
 }): Promise<NanobotChatResult> {
   const requestId = randomUUID();
   const sessionId = input.sessionId.slice(0, 160);
-  const timeoutMs = Math.min(Math.max(input.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5_000), 180_000);
 
   try {
-    const { baseUrl, apiKey } = config();
+    const { apiKey } = config();
+    const baseUrl = resolveWorkerEndpoint(input.worker ?? null);
+    const timeoutMs = Math.min(
+      Math.max(input.worker?.requestTimeoutMs ?? input.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5_000),
+      180_000,
+    );
+    const namespacedSessionId = input.worker
+      ? `${input.worker.sessionNamespace}:${sessionId}`.slice(0, 240)
+      : sessionId;
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -63,10 +80,11 @@ export async function runNanobotChat(input: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
           "X-NEXORA-Request-ID": requestId,
+          "X-NEXORA-Worker-Key": input.worker?.workerKey ?? "development-shared-runtime",
         },
         body: JSON.stringify({
           messages: [{ role: "user", content: input.message.slice(0, 12_000) }],
-          session_id: sessionId,
+          session_id: namespacedSessionId,
           stream: false,
         }),
         signal: controller.signal,

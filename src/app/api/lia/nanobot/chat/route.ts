@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { runNanobotChat } from "@/lib/lia/nanobot/client";
+import { getNanobotWorkerForUser } from "@/lib/security/nanobot-worker-registry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,8 +28,24 @@ export async function POST(request: Request) {
       ? (body as { sessionId: string }).sessionId.trim().slice(0, 160)
       : `nexora:${user.id}`;
 
-    const result = await runNanobotChat({ message, sessionId, allowFallback: true });
-    return NextResponse.json(result);
+    const worker = await getNanobotWorkerForUser(user.id);
+    const result = await runNanobotChat({
+      message,
+      sessionId,
+      worker,
+      allowFallback: true,
+    });
+
+    return NextResponse.json({
+      ...result,
+      worker: worker
+        ? {
+            id: worker.id,
+            status: worker.status,
+            environment: worker.environment,
+          }
+        : null,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "nanobot_request_failed" },
