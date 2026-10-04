@@ -65,7 +65,7 @@ export async function getNanobotWorkerForUser(userId: string): Promise<NanobotWo
     .eq("agent_id", principal.agentId)
     .eq("organization_id", principal.organizationId)
     .eq("desired_state", "running")
-    .in("status", ["ready", "provisioning"])
+    .eq("status", "ready")
     .maybeSingle();
 
   if (error) throw new Error(`nanobot_worker_lookup_failed: ${error.message}`);
