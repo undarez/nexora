@@ -72,6 +72,81 @@ export async function getNanobotWorkerForUser(userId: string): Promise<NanobotWo
   return data ? mapWorker(data) : null;
 }
 
+export async function getNanobotWorkerRecordForUser(userId: string): Promise<NanobotWorker | null> {
+  const principal = getLiaPrincipal(userId);
+  const { data, error } = await adminClient()
+    .from("lia_nanobot_workers")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("agent_id", principal.agentId)
+    .eq("organization_id", principal.organizationId)
+    .neq("status", "disabled")
+    .maybeSingle();
+
+  if (error) throw new Error(`nanobot_worker_record_lookup_failed: ${error.message}`);
+  return data ? mapWorker(data) : null;
+}
+
+export async function registerNanobotWorker(input: {
+  userId: string;
+  credentialId: string;
+  agentId: string;
+  organizationId: string;
+  workerKey: string;
+  endpointUrl: string;
+  workspaceRef: string;
+  configRef: string;
+  sessionNamespace: string;
+  environment?: "development" | "staging" | "production";
+}) {
+  const { data, error } = await adminClient()
+    .from("lia_nanobot_workers")
+    .insert({
+      user_id: input.userId,
+      agent_id: input.agentId,
+      organization_id: input.organizationId,
+      credential_id: input.credentialId,
+      worker_key: input.workerKey,
+      endpoint_url: input.endpointUrl,
+      workspace_ref: input.workspaceRef,
+      config_ref: input.configRef,
+      session_namespace: input.sessionNamespace,
+      environment: input.environment ?? "production",
+      status: "ready",
+      desired_state: "running",
+      last_started_at: new Date().toISOString(),
+      last_heartbeat_at: new Date().toISOString(),
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`nanobot_worker_register_failed: ${error.message}`);
+  return mapWorker(data);
+}
+
+export async function markNanobotWorkerError(workerId: string, errorCode: string) {
+  const { error } = await adminClient()
+    .from("lia_nanobot_workers")
+    .update({
+      status: "error",
+      last_error_code: errorCode.slice(0, 160),
+      failure_count: (await getFailureCount(workerId)) + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", workerId);
+  if (error) throw new Error(`nanobot_worker_error_update_failed: ${error.message}`);
+}
+
+async function getFailureCount(workerId: string) {
+  const { data, error } = await adminClient()
+    .from("lia_nanobot_workers")
+    .select("failure_count")
+    .eq("id", workerId)
+    .single();
+  if (error) throw new Error(`nanobot_worker_failure_lookup_failed: ${error.message}`);
+  return Number(data.failure_count);
+}
+
 export async function recordNanobotWorkerHeartbeat(input: {
   credentialId: string;
   workerKey: string;
