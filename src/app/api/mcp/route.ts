@@ -3,7 +3,8 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createMcpHandler, OAuthError, OAuthErrorCode, requireBearerAuth } from "@modelcontextprotocol/server";
 import { createNexoraMcpServer } from "@/lib/mcp/nexora-server";
 import { getLiaPrincipal } from "@/lib/security/agent-identity";
-import { verifyNanobotExecutionContext, type NanobotExecutionContext } from "@/lib/security/nanobot-execution-context";
+import { mintNanobotExecutionContext, verifyNanobotExecutionContext, type NanobotExecutionContext } from "@/lib/security/nanobot-execution-context";
+import { verifyNanobotRuntimeCredential, isNanobotRuntimeCredential } from "@/lib/security/nanobot-runtime-credential";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,40 @@ const bearerGate = requireBearerAuth({
           scopes: ["mcp"],
           expiresAt: executionContext.expiresAt,
           extra: { userId: executionContext.userId, nanobot: true, executionContext },
+        };
+      }
+
+      if (isNanobotRuntimeCredential(token)) {
+        const runtimeCredential = await verifyNanobotRuntimeCredential(token);
+        if (!runtimeCredential) throw new OAuthError(OAuthErrorCode.InvalidToken, "Identifiant de runtime Nanobot invalide ou révoqué.");
+
+        const { url, key } = getSupabaseAdminConfig();
+        const supabase = createSupabaseClient(url, key, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        });
+        const { data: autonomyData, error: autonomyError } = await supabase.rpc("get_lia_autonomy", { p_user_id: runtimeCredential.userId });
+        if (autonomyError) throw new OAuthError(OAuthErrorCode.InvalidToken, "Autonomie LIA indisponible.");
+        const autonomyLevel = Number(autonomyData);
+        if (!Number.isInteger(autonomyLevel) || autonomyLevel < 0 || autonomyLevel > 8) {
+          throw new OAuthError(OAuthErrorCode.InvalidToken, "Autonomie LIA invalide.");
+        }
+
+        const sessionId = `nanobot-runtime:${runtimeCredential.id}`;
+        const minted = await mintNanobotExecutionContext({
+          userId: runtimeCredential.userId,
+          agentId: runtimeCredential.agentId,
+          organizationId: runtimeCredential.organizationId,
+          sessionId,
+          autonomyLevel,
+          ttlMs: 60_000,
+        });
+
+        return {
+          token,
+          clientId: "nexora-nanobot-runtime",
+          scopes: ["mcp"],
+          expiresAt: minted.context.expiresAt,
+          extra: { userId: runtimeCredential.userId, nanobot: true, executionContext: minted.context },
         };
       }
 
