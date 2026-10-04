@@ -123,7 +123,8 @@
     "lia:research-evidence": "node scripts/lia-research-evidence-regression.mjs",
     "lia:model-response-runtime": "node scripts/lia-model-response-runtime-regression.mjs",
     "lia:nanobot-identity-bridge": "node scripts/lia-nanobot-identity-bridge-regression.mjs",
-    "lia:nanobot-mcp-runtime": "node scripts/lia-nanobot-mcp-runtime-regression.mjs"
+    "lia:nanobot-mcp-runtime": "node scripts/lia-nanobot-mcp-runtime-regression.mjs",
+    "lia:nanobot-isolation": "node scripts/lia-nanobot-isolation-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",
