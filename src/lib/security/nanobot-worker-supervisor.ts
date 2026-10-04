@@ -10,7 +10,9 @@ type ProvisionResponse = {
   workerKey?: string;
 };
 
-const WORKER_ENVIRONMENTS = new Set(["development", "staging", "production"] as const);\n\nfunction supervisorConfig() {
+const WORKER_ENVIRONMENTS = new Set(["development", "staging", "production"] as const);
+
+function supervisorConfig() {
   const url = process.env.NEXORA_NANOBOT_SUPERVISOR_URL?.trim().replace(/\/$/, "");
   const token = process.env.NEXORA_NANOBOT_SUPERVISOR_TOKEN?.trim();
   if (!url || !token) throw new Error("nanobot_supervisor_not_configured");
