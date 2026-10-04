@@ -72,6 +72,21 @@ export async function getNanobotWorkerForUser(userId: string): Promise<NanobotWo
   return data ? mapWorker(data) : null;
 }
 
+export async function getNanobotWorkerRecordForUser(userId: string): Promise<NanobotWorker | null> {
+  const principal = getLiaPrincipal(userId);
+  const { data, error } = await adminClient()
+    .from("lia_nanobot_workers")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("agent_id", principal.agentId)
+    .eq("organization_id", principal.organizationId)
+    .neq("status", "disabled")
+    .maybeSingle();
+
+  if (error) throw new Error(`nanobot_worker_record_lookup_failed: ${error.message}`);
+  return data ? mapWorker(data) : null;
+}
+
 export async function registerNanobotWorker(input: {
   userId: string;
   credentialId: string;
