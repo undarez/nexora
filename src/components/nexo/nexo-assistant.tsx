@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BrainCircuit, ChevronDown, Lightbulb, MessageCircle, Send, Settings2, ShieldCheck, Sparkles, X, CheckCircle2, AlertTriangle, RotateCcw, Target, CircleDot } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, BrainCircuit, ChevronDown, Lightbulb, MessageCircle, Send, Settings2, ShieldCheck, Sparkles, X, CheckCircle2, AlertTriangle, RotateCcw, Target, CircleDot, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { DEFAULT_MASCOT_ID, getMascot, MASCOT_ENABLED_KEY, MASCOT_ID_KEY } from "@/lib/mascot/mascot-data";
 
 type Insight = { id: string; title: string; message: string; actionLabel: string; actionHref: string; tone: "info" | "warning" | "success" };
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChatMessage = { role: "user" | "assistant"; content: string };\ntype SpeechRecognitionLike = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: any) => void) | null; onerror: ((event: any) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
 type ResearchInfo = { requested: boolean; provider?: string | null; status?: string; evidenceCount?: number; corroboratedClaims?: number; contradictions?: number; minimumEvidenceMet?: boolean; nextAction?: string; sources?: Array<{ title?: string; url?: string; tier?: string; confidence?: number }> };
 type GoalState = { goalId: string; state: string; progress: number; currentStep: string; nextAction: string; completedSteps: string[]; blockers: string[]; completedAt: string | null };
 type RecentGoal = GoalState & { loopRunId: string; objective: string; resumable: boolean; createdAt: string };
@@ -54,7 +54,7 @@ export function NexoAssistant() {
   const [liveStateOpen, setLiveStateOpen] = useState(true);
   const [proposals, setProposals] = useState<ActionProposal[]>([]);
   const [impactPreviews, setImpactPreviews] = useState<Record<string, ImpactPreview | null>>({});
-  const [previewBusy, setPreviewBusy] = useState<Record<string, boolean>>({});
+  const [previewBusy, setPreviewBusy] = useState<Record<string, boolean>>({});\n  const [listening, setListening] = useState(false);\n  const [speaking, setSpeaking] = useState(false);\n  const [voiceEnabled, setVoiceEnabled] = useState(true);\n  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);\n  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setPathname(window.location.pathname);
@@ -138,6 +138,29 @@ export function NexoAssistant() {
   const liveProgress = liveState?.goal?.progress ?? 0;
   const liveCurrent = liveState?.timeline?.find(item => item.status === "current") ?? null;
 
+  function startVoiceInput() {
+    if (listening) { recognitionRef.current?.stop(); return; }
+    const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!Recognition) { setMessages(prev => [...prev, { role: "assistant", content: "La saisie vocale n’est pas disponible dans ce navigateur. Vous pouvez utiliser le champ texte." }]); return; }
+    const recognition = new Recognition() as SpeechRecognitionLike;
+    recognition.lang = "fr-FR"; recognition.interimResults = false; recognition.continuous = false;
+    recognition.onresult = (event) => { const transcript = Array.from(event.results as ArrayLike<any>).map((result: any) => result?.[0]?.transcript || "").join(" ").trim(); if (transcript) setQuestion(prev => prev ? prev + " " + transcript : transcript); };
+    recognition.onerror = () => setListening(false); recognition.onend = () => setListening(false);
+    recognitionRef.current = recognition; setListening(true); recognition.start();
+  }
+
+  async function speakLia(text: string) {
+    if (!voiceEnabled || !text.trim() || speaking) return;
+    setSpeaking(true);
+    try {
+      const response = await fetch("/api/lia/voice/synthesize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: text.slice(0, 5000) }) });
+      if (!response.ok) throw new Error("Synthèse vocale indisponible.");
+      const blob = await response.blob(); const url = URL.createObjectURL(blob); const audio = new Audio(url); audioRef.current = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); setSpeaking(false); }; audio.onerror = () => { URL.revokeObjectURL(url); setSpeaking(false); }; await audio.play();
+    } catch { setSpeaking(false); }
+  }
+
+  function stopVoice() { recognitionRef.current?.stop(); if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; } setListening(false); setSpeaking(false); }
   async function ask(loopRunId?: string | null) {
     const text = question.trim().slice(0, 2000);
     if (!text || busy) return;
@@ -159,7 +182,7 @@ export function NexoAssistant() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "LIA n'a pas pu répondre.");
-      setMessages(prev => [...prev, { role: "assistant", content: data.analysis || "Je n'ai pas reçu de réponse exploitable." }]);
+      const assistantText = data.analysis || "Je n'ai pas reçu de réponse exploitable."; setMessages(prev => [...prev, { role: "assistant", content: assistantText }]); void speakLia(assistantText);
       if (data.session?.id) setSessionId(data.session.id);
       setExplainability(data.explainability || null);
       setResearch(data.research || null);
@@ -330,8 +353,8 @@ export function NexoAssistant() {
           {messages.length > 0 && <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             {["Mon budget","Mes dépenses","Mes objectifs","Analyser une transaction","Idées d’économies"].map(prompt => <button key={prompt} type="button" disabled={busy} onClick={() => { setQuestion(prompt); }} className="shrink-0 rounded-full border bg-background px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground transition hover:border-primary/40 hover:text-foreground disabled:opacity-50">{prompt}</button>)}
           </div>}
-          <div className="flex items-end gap-2 rounded-2xl border bg-background p-1.5 focus-within:ring-2 focus-within:ring-ring">{resumeLoopRunId && <span className="sr-only">Mode reprise d’objectif activé</span>}<input value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { const loop = resumeLoopRunId; setResumeLoopRunId(null); void ask(loop); } }} placeholder="Tapez votre message…" className="min-h-10 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" disabled={busy} /><button type="button" disabled={busy || !question.trim()} onClick={() => { const loop = resumeLoopRunId; setResumeLoopRunId(null); void ask(loop); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-50" aria-label="Envoyer"><Send className="h-4 w-4" /></button></div>
-          <div className="flex items-center justify-between gap-2 px-1 text-[9px] text-muted-foreground"><span className="flex min-w-0 items-center gap-1.5 truncate"><ShieldCheck className="h-3.5 w-3.5 shrink-0" />Données et actions restent gouvernées côté serveur.</span><Link href="/settings#mascotte" className="inline-flex shrink-0 items-center gap-1 font-semibold hover:underline"><Settings2 className="h-3 w-3" />Mascotte</Link></div>
+          <div className="flex items-end gap-2 rounded-2xl border bg-background p-1.5 focus-within:ring-2 focus-within:ring-ring">{resumeLoopRunId && <span className="sr-only">Mode reprise d’objectif activé</span>}<input value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { const loop = resumeLoopRunId; setResumeLoopRunId(null); void ask(loop); } }} placeholder="Tapez votre message…" className="min-h-10 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" disabled={busy} /><button type="button" disabled={busy} onClick={startVoiceInput} className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border disabled:opacity-50", listening && "bg-primary text-primary-foreground")} aria-label={listening ? "Arrêter la saisie vocale" : "Parler à Nexo"}>{listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}</button><button type="button" disabled={busy || !question.trim()} onClick={() => { const loop = resumeLoopRunId; setResumeLoopRunId(null); void ask(loop); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-50" aria-label="Envoyer"><Send className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between gap-2 px-1 text-[9px] text-muted-foreground"><span className="flex min-w-0 items-center gap-1.5 truncate"><ShieldCheck className="h-3.5 w-3.5 shrink-0" />Données et actions restent gouvernées côté serveur.</span><button type="button" onClick={() => { if (speaking) stopVoice(); else setVoiceEnabled(v => !v); }} className="inline-flex shrink-0 items-center gap-1 font-semibold hover:underline" aria-label={voiceEnabled ? "Désactiver la voix" : "Activer la voix"}>{voiceEnabled ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}Voix</button><Link href="/settings#mascotte" className="inline-flex shrink-0 items-center gap-1 font-semibold hover:underline"><Settings2 className="h-3 w-3" />Mascotte</Link></div>
         </div>}
       </div>
     </div>}
