@@ -10,7 +10,7 @@ type ProvisionResponse = {
   workerKey?: string;
 };
 
-function supervisorConfig() {
+const WORKER_ENVIRONMENTS = new Set(["development", "staging", "production"] as const);\n\nfunction supervisorConfig() {
   const url = process.env.NEXORA_NANOBOT_SUPERVISOR_URL?.trim().replace(/\/$/, "");
   const token = process.env.NEXORA_NANOBOT_SUPERVISOR_TOKEN?.trim();
   if (!url || !token) throw new Error("nanobot_supervisor_not_configured");
@@ -53,7 +53,7 @@ export async function provisionNanobotWorkerForUser(userId: string): Promise<Nan
     userId,
     agentId: principal.agentId,
     organizationId: principal.organizationId,
-    environment: process.env.NANOBOT_WORKER_ENVIRONMENT ?? "production",
+    environment: workerEnvironment(),
     workspaceIsolation: "per-user",
     workspaceRef: `nexora-workspace:${userId}:${randomUUID()}`,
     configRef: `nexora-config:${userId}:${randomUUID()}`,
@@ -81,7 +81,7 @@ export async function provisionNanobotWorkerForUser(userId: string): Promise<Nan
       workspaceRef: provisioned.workspaceRef,
       configRef: provisioned.configRef,
       sessionNamespace,
-      environment: (request.environment as "development" | "staging" | "production"),
+      environment: request.environment,
     });
   } catch (error) {
     await revokeNanobotRuntimeCredential(userId, issued.id).catch(() => undefined);
