@@ -54,12 +54,16 @@ export async function verifyNanobotRuntimeCredential(credential: string) {
   const provided = Buffer.from(hash, "hex");
   if (stored.length !== provided.length || !timingSafeEqual(stored, provided)) return null;
 
-  void adminClient()
-    .from("lia_nanobot_runtime_credentials")
-    .update({ last_used_at: new Date().toISOString() })
-    .eq("id", data.id)
-    .then(() => undefined)
-    .catch(() => undefined);
+  void (async () => {
+    try {
+      await adminClient()
+        .from("lia_nanobot_runtime_credentials")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", data.id);
+    } catch {
+      // Telemetry must never turn an otherwise valid credential into a failed request.
+    }
+  })();
 
   return {
     id: String(data.id),
