@@ -14,10 +14,22 @@ Nexo uses the browser Web Speech recognition API when available, configured for 
 
 Speech recognition availability depends on the browser/device and its permission model.
 
+### Fish Audio
+
+```env
+NEXORA_VOICE_PROVIDER=fish
+FISH_AUDIO_API_KEY=
+FISH_AUDIO_VOICE_ID=
+FISH_AUDIO_MODEL=s2.1-pro-free
+```
+
+Fish Audio currently exposes `POST /v1/tts`; the S2.1 Pro API supports expressive direction tags and multilingual speech. citeturn0search0turn0search3
+
 ## Speech output
 
 The server-side voice gateway supports:
 
+- Fish Audio S2.1 Pro (primary Nexo provider);
 - Hume Octave TTS;
 - ElevenLabs TTS.
 
