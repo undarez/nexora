@@ -12,6 +12,14 @@ type ProvisionResponse = {
 
 const WORKER_ENVIRONMENTS = new Set(["development", "staging", "production"] as const);
 
+function workerEnvironment(): "development" | "staging" | "production" {
+  const value = process.env.NANOBOT_WORKER_ENVIRONMENT?.trim() || "production";
+  if (!WORKER_ENVIRONMENTS.has(value as "development" | "staging" | "production")) {
+    throw new Error("nanobot_worker_environment_invalid");
+  }
+  return value as "development" | "staging" | "production";
+}
+
 function supervisorConfig() {
   const url = process.env.NEXORA_NANOBOT_SUPERVISOR_URL?.trim().replace(/\/$/, "");
   const token = process.env.NEXORA_NANOBOT_SUPERVISOR_TOKEN?.trim();
