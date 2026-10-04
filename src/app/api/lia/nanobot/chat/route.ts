@@ -43,7 +43,6 @@ export async function POST(request: Request) {
             id: worker.id,
             status: worker.status,
             environment: worker.environment,
-            workerKey: worker.workerKey,
           }
         : null,
     });
