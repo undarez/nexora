@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
 
-    const existing = await getNanobotWorkerForUser(user.id);
+    const existing = await getNanobotWorkerRecordForUser(user.id);
     if (existing) {
       return NextResponse.json({ ok: true, worker: { id: existing.id, status: existing.status } });
     }
