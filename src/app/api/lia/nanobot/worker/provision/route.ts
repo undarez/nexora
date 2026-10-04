@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { assertSameOrigin } from "@/lib/security/csrf";
-import { getNanobotWorkerForUser } from "@/lib/security/nanobot-worker-registry";
+import { getNanobotWorkerRecordForUser } from "@/lib/security/nanobot-worker-registry";
 import { provisionNanobotWorkerForUser } from "@/lib/security/nanobot-worker-supervisor";
 
 export const runtime = "nodejs";
