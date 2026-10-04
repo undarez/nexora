@@ -81,12 +81,4 @@ export async function revokeNanobotRuntimeCredential(userId: string, credentialI
     .eq("user_id", userId)
     .is("revoked_at", null);
   if (error) throw new Error(`nanobot_runtime_credential_revoke_failed: ${error.message}`);
-}export async function revokeNanobotRuntimeCredential(userId: string, credentialId: string) {
-  const { error } = await adminClient()
-    .from("lia_nanobot_runtime_credentials")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", credentialId)
-    .eq("user_id", userId)
-    .is("revoked_at", null);
-  if (error) throw new Error(`nanobot_runtime_credential_revoke_failed: ${error.message}`);
 }
