@@ -23,7 +23,7 @@ FISH_AUDIO_VOICE_ID=
 FISH_AUDIO_MODEL=s2.1-pro-free
 ```
 
-Fish Audio currently exposes `POST /v1/tts`; the S2.1 Pro API supports expressive direction tags and multilingual speech. citeturn0search0turn0search3
+Fish Audio is integrated server-side through its TTS endpoint. Provider-specific capabilities should be verified against the current provider documentation before production changes.
 
 ## Speech output
 
