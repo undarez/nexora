@@ -126,6 +126,7 @@
     "lia:nanobot-mcp-runtime": "node scripts/lia-nanobot-mcp-runtime-regression.mjs",
     "lia:nanobot-isolation": "node scripts/lia-nanobot-isolation-regression.mjs",
     "lia:nanobot-worker-runtime": "node scripts/lia-nanobot-worker-runtime-regression.mjs",
+    "lia:behavioral-evaluation": "node scripts/lia-behavioral-evaluation.mjs",
     "lia:voice-nexo": "node scripts/lia-voice-nexo-regression.mjs"
   },
   "dependencies": {
