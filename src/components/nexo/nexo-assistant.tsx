@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { DEFAULT_MASCOT_ID, getMascot, MASCOT_ENABLED_KEY, MASCOT_ID_KEY } from "@/lib/mascot/mascot-data";
 
 type Insight = { id: string; title: string; message: string; actionLabel: string; actionHref: string; tone: "info" | "warning" | "success" };
-type ChatMessage = { role: "user" | "assistant"; content: string };\ntype SpeechRecognitionLike = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: any) => void) | null; onerror: ((event: any) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
+type ChatMessage = { role: "user" | "assistant"; content: string };
+type SpeechRecognitionLike = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: any) => void) | null; onerror: ((event: any) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
 type ResearchInfo = { requested: boolean; provider?: string | null; status?: string; evidenceCount?: number; corroboratedClaims?: number; contradictions?: number; minimumEvidenceMet?: boolean; nextAction?: string; sources?: Array<{ title?: string; url?: string; tier?: string; confidence?: number }> };
 type GoalState = { goalId: string; state: string; progress: number; currentStep: string; nextAction: string; completedSteps: string[]; blockers: string[]; completedAt: string | null };
 type RecentGoal = GoalState & { loopRunId: string; objective: string; resumable: boolean; createdAt: string };
@@ -54,7 +55,12 @@ export function NexoAssistant() {
   const [liveStateOpen, setLiveStateOpen] = useState(true);
   const [proposals, setProposals] = useState<ActionProposal[]>([]);
   const [impactPreviews, setImpactPreviews] = useState<Record<string, ImpactPreview | null>>({});
-  const [previewBusy, setPreviewBusy] = useState<Record<string, boolean>>({});\n  const [listening, setListening] = useState(false);\n  const [speaking, setSpeaking] = useState(false);\n  const [voiceEnabled, setVoiceEnabled] = useState(true);\n  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);\n  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [previewBusy, setPreviewBusy] = useState<Record<string, boolean>>({});
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setPathname(window.location.pathname);
