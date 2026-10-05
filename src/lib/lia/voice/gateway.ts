@@ -37,8 +37,10 @@ async function hume(request: VoiceRequest) {
   if (!key) throw new Error("HUME_API_KEY n'est pas configurée.");
 
   const utterance: Record<string, unknown> = { text: cleanText(request.text) };
-  if (request.voiceId) utterance.voice = { id: request.voiceId };
-  else if (request.voiceName) utterance.voice = { name: request.voiceName, provider: "HUME_AI" };
+  const voiceId = request.voiceId || process.env.HUME_VOICE_ID;
+  const voiceName = request.voiceName || process.env.HUME_VOICE_NAME;
+  if (voiceId) utterance.voice = { id: voiceId };
+  else if (voiceName) utterance.voice = { name: voiceName, provider: "HUME_AI" };
   if (request.style) utterance.description = request.style.slice(0, 1000);
 
   const response = await fetch("https://api.hume.ai/v0/tts", {
