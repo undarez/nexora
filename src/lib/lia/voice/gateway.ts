@@ -12,7 +12,6 @@ function cleanText(text: string) {
   return text.trim().slice(0, 5000);
 }
 
-
 async function fish(request: VoiceRequest) {
   const key = process.env.FISH_AUDIO_API_KEY;
   if (!key) throw new Error("FISH_AUDIO_API_KEY n’est pas configurée.");
@@ -21,13 +20,18 @@ async function fish(request: VoiceRequest) {
   if (referenceId) body.reference_id = referenceId;
   const response = await fetch("https://api.fish.audio/v1/tts", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, model: process.env.FISH_AUDIO_MODEL || "s2.1-pro-free" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+      model: process.env.FISH_AUDIO_MODEL || "s2.1-pro-free",
+    },
     body: JSON.stringify(body),
     cache: "no-store",
   });
   if (!response.ok) throw new Error(`Fish Audio TTS HTTP ${response.status}`);
   return Buffer.from(await response.arrayBuffer());
 }
+
 async function hume(request: VoiceRequest) {
   const key = process.env.HUME_API_KEY;
   if (!key) throw new Error("HUME_API_KEY n'est pas configurée.");
@@ -70,6 +74,7 @@ async function elevenlabs(request: VoiceRequest) {
 
 export async function synthesizeVoice(request: VoiceRequest) {
   const provider = request.provider || ((process.env.NEXORA_VOICE_PROVIDER as VoiceProvider) || "hume");
+  if (provider === "fish") return fish(request);
   if (provider === "elevenlabs") return elevenlabs(request);
   return hume(request);
 }
