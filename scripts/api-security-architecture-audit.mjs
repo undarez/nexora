@@ -40,7 +40,7 @@ for (const file of routes) {
     /authorization/.test(source) &&
     /Bearer/.test(source) &&
     /function authorized/.test(source);
-  const hasNanobotRuntimeAuth = /verifyNanobotRuntimeCredential\\(/.test(source);
+  const hasNanobotRuntimeAuth = source.includes("verifyNanobotRuntimeCredential(");
   const hasUserAuth = !hasMcpBearerAuth && !hasCronSecretAuth && !hasNanobotRuntimeAuth &&
     /auth\.getUser\(|auth\.getSession\(|getUser\(|getMobileAuth\(|requireAdmin|assertAdmin|\bcreateClient\(\)/.test(source);
   const hasAuth = hasUserAuth || hasCronSecretAuth || hasMcpBearerAuth || hasNanobotRuntimeAuth;
