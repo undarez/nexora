@@ -31,7 +31,7 @@ const required = [
   ["password login redirects to dashboard", authPage.includes('searchParams.get("next") || "/dashboard"')],
   ["OAuth callback defaults to dashboard", authCallback.includes('url.searchParams.get("next") || "/dashboard"')],
   ["email confirmation redirects to dashboard", authConfirm.includes('new URL("/dashboard", url.origin)')],
-  ["weekly report calculates finance score", weeklyReport.includes("Score financier") && weeklyReport.includes("criteria") && weeklyReport.includes("score")],
+  ["weekly report calculates finance score", weeklyReport.includes("${score}/100") && weeklyReport.includes("criteria") && weeklyReport.includes("score")],
   ["weekly report sends through server email provider", weeklyReport.includes("sendNexoraEmail")],
   ["weekly report cron action is dispatched", runtimeCron.includes('"weekly_financial_report"') && runtimeCron.includes("sendWeeklyFinancialReport")],
   ["weekly report job is idempotently provisioned", protectedLayout.includes("lia_ensure_weekly_financial_report_job") && weeklyMigration.includes("lia_runtime_jobs_weekly_financial_report_uidx")],
