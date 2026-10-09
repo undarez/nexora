@@ -86,7 +86,7 @@ export default function AuthPage() {
       });
       setBusy(false);
       if (authError) setError(authError.message);
-      else window.location.href = searchParams.get("next") || "/onboarding";
+      else window.location.href = searchParams.get("next") || "/dashboard";
       return;
     }
 
@@ -156,7 +156,7 @@ export default function AuthPage() {
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     });
     if (authError) setError(authError.message);
