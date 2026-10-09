@@ -98,7 +98,7 @@ export default function AuthPage() {
       });
       setBusy(false);
       if (authError) setError(authError.message);
-      else window.location.href = searchParams.get("next") || "/dashboard";
+      else window.location.replace("/dashboard");
       return;
     }
 
@@ -116,7 +116,7 @@ export default function AuthPage() {
     }
 
     if (result.hasSession) {
-      window.location.href = searchParams.get("next") || "/dashboard";
+      window.location.replace("/dashboard");
     } else {
       setMessage("Compte créé. Vérifie ton email pour confirmer ton adresse.");
     }
