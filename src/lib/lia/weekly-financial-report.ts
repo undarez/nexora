@@ -12,16 +12,17 @@ export async function sendWeeklyFinancialReport({ supabase, userId, admin }: { s
   const now = new Date();
   const start = new Date(now.getTime() - 7 * 86400000);
   const previousStart = new Date(now.getTime() - 14 * 86400000);
-  const [tx, bankTx, oldTx, oldBankTx, accounts, bankAccounts, scenario] = await Promise.all([
+  const [tx, bankTx, oldTx, oldBankTx, accounts, bankAccounts, connections, scenario] = await Promise.all([
     supabase.from("transactions").select("amount,occurred_at").eq("user_id", userId).gte("occurred_at", start.toISOString()).lt("occurred_at", now.toISOString()),
     supabase.from("bank_transactions").select("amount,booked_at").eq("user_id", userId).gte("booked_at", start.toISOString()).lt("booked_at", now.toISOString()),
     supabase.from("transactions").select("amount,occurred_at").eq("user_id", userId).gte("occurred_at", previousStart.toISOString()).lt("occurred_at", start.toISOString()),
     supabase.from("bank_transactions").select("amount,booked_at").eq("user_id", userId).gte("booked_at", previousStart.toISOString()).lt("booked_at", start.toISOString()),
     supabase.from("accounts").select("balance").eq("user_id", userId),
     supabase.from("bank_accounts").select("balance,status").eq("user_id", userId).eq("status", "active"),
+    supabase.from("bank_connections").select("status,updated_at").eq("user_id", userId).not("status", "in", "(revoked,disconnected)"),
     supabase.from("budget_scenarios").select("envelopes").eq("user_id", userId).order("period_start", { ascending: false }).limit(1).maybeSingle(),
   ]);
-  for (const result of [tx, bankTx, oldTx, oldBankTx, accounts, bankAccounts, scenario]) if (result.error) throw new Error("weekly_report_data_unavailable");
+  for (const result of [tx, bankTx, oldTx, oldBankTx, accounts, bankAccounts, connections, scenario]) if (result.error) throw new Error("weekly_report_data_unavailable");
 
   const values = (rows: Array<{amount:number|string}> | null) => (rows ?? []).map(row => Number(row.amount) || 0);
   const current = [...values(tx.data), ...values(bankTx.data)];
@@ -34,6 +35,8 @@ export async function sendWeeklyFinancialReport({ supabase, userId, admin }: { s
   const envelopes = Array.isArray(scenario.data?.envelopes) ? scenario.data.envelopes as Array<{planned?:number;spent?:number}> : [];
   const planned = envelopes.reduce((s,r) => s + Math.max(0,Number(r.planned)||0),0);
   const budgetSpent = envelopes.reduce((s,r) => s + Math.max(0,Number(r.spent)||0),0);
+  const latestConnectionUpdate = (connections.data ?? []).map((r: {updated_at?:string|null}) => r.updated_at ? new Date(r.updated_at).getTime() : 0).filter((n:number) => n > 0).sort((a:number,b:number) => b-a)[0];
+  const freshnessHours = latestConnectionUpdate ? (now.getTime()-latestConnectionUpdate)/3600000 : null;
 
   const criteria = [
     { name: "Budget", max: 25, points: planned ? (budgetSpent/planned <= .8 ? 25 : budgetSpent/planned <= 1 ? 18 : budgetSpent/planned <= 1.15 ? 10 : 0) : 12,
@@ -44,8 +47,8 @@ export async function sendWeeklyFinancialReport({ supabase, userId, admin }: { s
       detail: `Solde estimé ${eur(balance)} ; dépenses de la semaine ${eur(expenses)}.` },
     { name: "Évolution des dépenses", max: 15, points: priorExpenses ? (expenses <= priorExpenses ? 15 : expenses <= priorExpenses*1.1 ? 10 : expenses <= priorExpenses*1.25 ? 5 : 0) : 8,
       detail: `${eur(expenses)} cette semaine contre ${eur(priorExpenses)} la semaine précédente.` },
-    { name: "Qualité des données", max: 15, points: current.length > 0 && (accounts.data?.length || bankAccounts.data?.length) ? 15 : 5,
-      detail: "Le score dépend des opérations et comptes accessibles au moment du calcul." },
+    { name: "Fraîcheur des données", max: 15, points: freshnessHours === null ? 5 : freshnessHours <= 48 ? 15 : freshnessHours <= 168 ? 10 : 3,
+      detail: freshnessHours === null ? "Aucune date de mise à jour bancaire disponible." : `Dernière mise à jour bancaire il y a ${Math.max(0,Math.round(freshnessHours))} h.` },
   ];
   const score = criteria.reduce((s,c) => s+c.points,0);
   const label = score >= 85 ? "Très bonne maîtrise" : score >= 70 ? "Situation plutôt saine" : score >= 50 ? "Vigilance recommandée" : score >= 30 ? "Actions prioritaires" : "Situation à examiner";
