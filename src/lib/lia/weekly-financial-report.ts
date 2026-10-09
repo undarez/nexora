@@ -19,7 +19,7 @@ export async function sendWeeklyFinancialReport({ supabase, userId, admin }: { s
     supabase.from("bank_transactions").select("amount,booked_at").eq("user_id", userId).gte("booked_at", previousStart.toISOString()).lt("booked_at", start.toISOString()),
     supabase.from("accounts").select("balance").eq("user_id", userId),
     supabase.from("bank_accounts").select("balance,status").eq("user_id", userId).eq("status", "active"),
-    supabase.from("bank_connections").select("status,updated_at").eq("user_id", userId).not("status", "in", "(revoked,disconnected)"),
+    supabase.from("bank_connections").select("status,last_synced_at").eq("user_id", userId).not("status", "in", "(revoked,disconnected)"),
     supabase.from("budget_scenarios").select("envelopes").eq("user_id", userId).order("period_start", { ascending: false }).limit(1).maybeSingle(),
   ]);
   for (const result of [tx, bankTx, oldTx, oldBankTx, accounts, bankAccounts, connections, scenario]) if (result.error) throw new Error("weekly_report_data_unavailable");
@@ -35,7 +35,7 @@ export async function sendWeeklyFinancialReport({ supabase, userId, admin }: { s
   const envelopes = Array.isArray(scenario.data?.envelopes) ? scenario.data.envelopes as Array<{planned?:number;spent?:number}> : [];
   const planned = envelopes.reduce((s,r) => s + Math.max(0,Number(r.planned)||0),0);
   const budgetSpent = envelopes.reduce((s,r) => s + Math.max(0,Number(r.spent)||0),0);
-  const latestConnectionUpdate = (connections.data ?? []).map((r: {updated_at?:string|null}) => r.updated_at ? new Date(r.updated_at).getTime() : 0).filter((n:number) => n > 0).sort((a:number,b:number) => b-a)[0];
+  const latestConnectionUpdate = (connections.data ?? []).map((r: {last_synced_at?:string|null}) => r.last_synced_at ? new Date(r.last_synced_at).getTime() : 0).filter((n:number) => n > 0).sort((a:number,b:number) => b-a)[0];
   const freshnessHours = latestConnectionUpdate ? (now.getTime()-latestConnectionUpdate)/3600000 : null;
 
   const criteria = [
