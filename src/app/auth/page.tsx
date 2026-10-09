@@ -104,7 +104,7 @@ export default function AuthPage() {
     }
 
     if (result.hasSession) {
-      window.location.href = searchParams.get("next") || "/onboarding";
+      window.location.href = searchParams.get("next") || "/dashboard";
     } else {
       setMessage("Compte créé. Vérifie ton email pour confirmer ton adresse.");
     }
