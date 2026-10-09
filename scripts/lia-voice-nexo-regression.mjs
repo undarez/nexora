@@ -10,6 +10,7 @@ const conversation = read("src/lib/lia/chat-conversation.ts");
 const nexo = read("src/components/nexo/nexo-assistant.tsx");
 const authPage = read("src/app/auth/page.tsx");
 const landingPage = read("src/app/(landing)/page.tsx");
+const onboardingPage = read("src/app/onboarding/page.tsx");
 const authCallback = read("src/app/auth/callback/route.ts");
 const authConfirm = read("src/app/auth/confirm/route.ts");
 const weeklyReport = read("src/lib/lia/weekly-financial-report.ts");
@@ -32,6 +33,7 @@ const required = [
   ["password login always redirects to dashboard", authPage.includes('window.location.replace("/dashboard")')],
   ["existing sessions leave auth page for dashboard", authPage.includes('supabase.auth.getUser().then(({ data }) =>') && authPage.includes('window.location.replace("/dashboard")')],
   ["authenticated visitors leave landing page", landingPage.includes('const supabase = await createClient()') && landingPage.includes('if (user) redirect("/dashboard")')],
+  ["existing users bypass workspace choice by default", onboardingPage.includes('searchParams.get("setup") === "1"') && onboardingPage.includes('else if (!setupRequested) router.replace("/dashboard")')],
   ["OAuth callback always redirects to dashboard", authCallback.includes('new URL("/dashboard", url.origin)') && !authCallback.includes('new URL(next, url.origin)')],
   ["email confirmation redirects to dashboard", authConfirm.includes('new URL("/dashboard", url.origin)')],
   ["weekly report calculates finance score", weeklyReport.includes("${score}/100") && weeklyReport.includes("criteria") && weeklyReport.includes("score")],
