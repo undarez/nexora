@@ -9,6 +9,7 @@ const route = read("src/app/api/lia/voice/synthesize/route.ts");
 const conversation = read("src/lib/lia/chat-conversation.ts");
 const nexo = read("src/components/nexo/nexo-assistant.tsx");
 const authPage = read("src/app/auth/page.tsx");
+const landingPage = read("src/app/(landing)/page.tsx");
 const authCallback = read("src/app/auth/callback/route.ts");
 const authConfirm = read("src/app/auth/confirm/route.ts");
 const weeklyReport = read("src/lib/lia/weekly-financial-report.ts");
@@ -28,8 +29,10 @@ const required = [
   ["evaluation persistence", conversation.includes("lia_response_evaluations")],
   ["Nexo microphone", nexo.includes("SpeechRecognition") && nexo.includes("<Mic")],
   ["Nexo spoken response", nexo.includes("speakLia") && nexo.includes("/api/lia/voice/synthesize")],
-  ["password login redirects to dashboard", authPage.includes('searchParams.get("next") || "/dashboard"')],
-  ["OAuth callback defaults to dashboard", authCallback.includes('url.searchParams.get("next") || "/dashboard"')],
+  ["password login always redirects to dashboard", authPage.includes('window.location.replace("/dashboard")')],
+  ["existing sessions leave auth page for dashboard", authPage.includes('supabase.auth.getUser().then(({ data }) =>') && authPage.includes('window.location.replace("/dashboard")')],
+  ["authenticated visitors leave landing page", landingPage.includes('const supabase = await createClient()') && landingPage.includes('if (user) redirect("/dashboard")')],
+  ["OAuth callback always redirects to dashboard", authCallback.includes('new URL("/dashboard", url.origin)') && !authCallback.includes('new URL(next, url.origin)')],
   ["email confirmation redirects to dashboard", authConfirm.includes('new URL("/dashboard", url.origin)')],
   ["weekly report calculates finance score", weeklyReport.includes("${score}/100") && weeklyReport.includes("criteria") && weeklyReport.includes("score")],
   ["weekly report sends through server email provider", weeklyReport.includes("sendNexoraEmail")],
