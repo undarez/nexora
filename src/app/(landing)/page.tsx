@@ -84,7 +84,14 @@ const workflow = [
   { icon: Gauge, step: "04", title: "Vous gardez la décision", text: "Les actions sensibles restent sous votre contrôle. L'application vous accompagne, elle ne décide pas à votre place." },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Authenticated users should never be left on the public landing page.
+  const supabase = await createClient();
+  if (supabase) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) redirect("/dashboard");
+  }
+
   return (
     <main className="landing-page overflow-hidden">
       <section className="landing-hero landing-hero-v2 relative">
