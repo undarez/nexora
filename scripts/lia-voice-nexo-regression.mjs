@@ -21,7 +21,7 @@ const required = [
   ["Fish API endpoint", gateway.includes("https://api.fish.audio/v1/tts")],
   ["Fish server dispatch", gateway.includes('if (provider === "fish") return fish(request)')],
   ["server-side Fish secret", gateway.includes("FISH_AUDIO_API_KEY")],
-  ["voice synthesis route", route.includes("/api/lia/voice/synthesize")],
+  ["voice synthesis route", route.includes("synthesizeVoice") && route.includes("export async function POST")],
   ["same-origin protection", route.includes("assertSameOrigin")],
   ["authentication", route.includes("supabase.auth.getUser()")],
   ["conversation evaluation", conversation.includes("evaluateAndCorrectLiaResponse")],
