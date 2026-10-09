@@ -23,6 +23,10 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth?reason=auth_required");
 
+  // Idempotent provisioning: the database function creates at most one weekly report job per user.
+  // Reporting is read-only; a scheduler setup failure must not prevent dashboard access.
+  try { await supabase.rpc("lia_ensure_weekly_financial_report_job"); } catch { /* surfaced in runtime/admin telemetry */ }
+
   const isAdmin = (process.env.ADMIN_EMAILS || "").split(",").map((v) => v.trim().toLowerCase()).includes((user.email || "").toLowerCase());
 
   return <div className="protected-app-shell"><LiaRuntimeBootstrap /><ProductAnalyticsTracker /><DesktopSidebar isAdmin={isAdmin} /><div className="desktop-main"><AppTopbar displayName={(user.user_metadata?.display_name as string | undefined) ?? null} email={user.email} /><div className="route-transition"><MinimumRouteLoader>{children}</MinimumRouteLoader></div></div><NexoAssistant /><NexoLiveObserver /><FirstVisitGuide userId={user.id} /><AndroidInteractionLayer /></div>;

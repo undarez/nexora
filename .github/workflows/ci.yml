@@ -82,6 +82,12 @@ jobs:
       - name: Model / response runtime regression
         run: npm run lia:model-response-runtime
 
+      - name: Nexo voice, auth redirect and weekly report regression
+        run: npm run lia:voice-nexo
+
+      - name: LIA behavioral corpus quality gate
+        run: npm run lia:behavioral-evaluation
+
       - name: Verification / recovery regressions
         run: |
           npm run lia:verification-resume

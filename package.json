@@ -125,7 +125,9 @@
     "lia:nanobot-identity-bridge": "node scripts/lia-nanobot-identity-bridge-regression.mjs",
     "lia:nanobot-mcp-runtime": "node scripts/lia-nanobot-mcp-runtime-regression.mjs",
     "lia:nanobot-isolation": "node scripts/lia-nanobot-isolation-regression.mjs",
-    "lia:nanobot-worker-runtime": "node scripts/lia-nanobot-worker-runtime-regression.mjs"
+    "lia:nanobot-worker-runtime": "node scripts/lia-nanobot-worker-runtime-regression.mjs",
+    "lia:behavioral-evaluation": "node scripts/lia-behavioral-evaluation.mjs",
+    "lia:voice-nexo": "node scripts/lia-voice-nexo-regression.mjs"
   },
   "dependencies": {
     "@iconify/react": "6.0.2",
@@ -135,7 +137,6 @@
     "@supabase/supabase-js": "^2.112.4",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "fish-audio": "0.1.0",
     "lucide-react": "1.34.0",
     "next": "16.3.3",
     "react": "19.2.8",

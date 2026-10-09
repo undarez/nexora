@@ -40,10 +40,11 @@ for (const file of routes) {
     /authorization/.test(source) &&
     /Bearer/.test(source) &&
     /function authorized/.test(source);
-  const hasUserAuth = !hasMcpBearerAuth && !hasCronSecretAuth &&
+  const hasNanobotRuntimeAuth = source.includes("verifyNanobotRuntimeCredential(");
+  const hasUserAuth = !hasMcpBearerAuth && !hasCronSecretAuth && !hasNanobotRuntimeAuth &&
     /auth\.getUser\(|auth\.getSession\(|getUser\(|getMobileAuth\(|requireAdmin|assertAdmin|\bcreateClient\(\)/.test(source);
-  const hasAuth = hasUserAuth || hasCronSecretAuth || hasMcpBearerAuth;
-  const machineToMachineMutation = (hasCronSecretAuth || hasMcpBearerAuth) && !hasUserAuth;
+  const hasAuth = hasUserAuth || hasCronSecretAuth || hasMcpBearerAuth || hasNanobotRuntimeAuth;
+  const machineToMachineMutation = (hasCronSecretAuth || hasMcpBearerAuth || hasNanobotRuntimeAuth) && !hasUserAuth;
   const methods = [...source.matchAll(/export\s+async\s+function\s+(POST|PUT|PATCH|DELETE)\b/g)].map((m) => m[1]);
   const hasMutation = methods.length > 0;
 

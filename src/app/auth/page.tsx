@@ -27,6 +27,18 @@ export default function AuthPage() {
   const [confirmationResent, setConfirmationResent] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled && data.user) window.location.replace("/dashboard");
+    });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     const reason = searchParams.get("reason");
     if (searchParams.get("message") === "confirmed") {
       setMessage("Email confirmé. Tu peux maintenant te connecter.");
@@ -86,7 +98,7 @@ export default function AuthPage() {
       });
       setBusy(false);
       if (authError) setError(authError.message);
-      else window.location.href = searchParams.get("next") || "/onboarding";
+      else window.location.replace("/dashboard");
       return;
     }
 
@@ -104,7 +116,7 @@ export default function AuthPage() {
     }
 
     if (result.hasSession) {
-      window.location.href = searchParams.get("next") || "/onboarding";
+      window.location.replace("/dashboard");
     } else {
       setMessage("Compte créé. Vérifie ton email pour confirmer ton adresse.");
     }
@@ -156,7 +168,7 @@ export default function AuthPage() {
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     });
     if (authError) setError(authError.message);

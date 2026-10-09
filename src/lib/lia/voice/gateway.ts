@@ -1,4 +1,4 @@
-export type VoiceProvider = "hume" | "elevenlabs";
+export type VoiceProvider = "fish" | "hume" | "elevenlabs";
 
 export type VoiceRequest = {
   text: string;
@@ -12,13 +12,35 @@ function cleanText(text: string) {
   return text.trim().slice(0, 5000);
 }
 
+async function fish(request: VoiceRequest) {
+  const key = process.env.FISH_AUDIO_API_KEY;
+  if (!key) throw new Error("FISH_AUDIO_API_KEY n’est pas configurée.");
+  const body: Record<string, unknown> = { text: cleanText(request.text), format: "mp3" };
+  const referenceId = request.voiceId || process.env.FISH_AUDIO_VOICE_ID;
+  if (referenceId) body.reference_id = referenceId;
+  const response = await fetch("https://api.fish.audio/v1/tts", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+      model: process.env.FISH_AUDIO_MODEL || "s2.1-pro-free",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Fish Audio TTS HTTP ${response.status}`);
+  return Buffer.from(await response.arrayBuffer());
+}
+
 async function hume(request: VoiceRequest) {
   const key = process.env.HUME_API_KEY;
   if (!key) throw new Error("HUME_API_KEY n'est pas configurée.");
 
   const utterance: Record<string, unknown> = { text: cleanText(request.text) };
-  if (request.voiceId) utterance.voice = { id: request.voiceId };
-  else if (request.voiceName) utterance.voice = { name: request.voiceName, provider: "HUME_AI" };
+  const voiceId = request.voiceId || process.env.HUME_VOICE_ID;
+  const voiceName = request.voiceName || process.env.HUME_VOICE_NAME;
+  if (voiceId) utterance.voice = { id: voiceId };
+  else if (voiceName) utterance.voice = { name: voiceName, provider: "HUME_AI" };
   if (request.style) utterance.description = request.style.slice(0, 1000);
 
   const response = await fetch("https://api.hume.ai/v0/tts", {
@@ -54,6 +76,7 @@ async function elevenlabs(request: VoiceRequest) {
 
 export async function synthesizeVoice(request: VoiceRequest) {
   const provider = request.provider || ((process.env.NEXORA_VOICE_PROVIDER as VoiceProvider) || "hume");
+  if (provider === "fish") return fish(request);
   if (provider === "elevenlabs") return elevenlabs(request);
   return hume(request);
 }

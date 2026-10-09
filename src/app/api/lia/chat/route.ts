@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     // Default task/question are valid when no JSON body is supplied.
   }
 
-  const conversationResponse = await handleLiaConversation(requestedQuestion, history);
+  const conversationResponse = await handleLiaConversation(requestedQuestion, history, { supabase, userId: user.id });
   if (conversationResponse) return conversationResponse;
 
   let loopRunId: string | null = null;
