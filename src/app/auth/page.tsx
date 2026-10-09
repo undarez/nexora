@@ -27,6 +27,18 @@ export default function AuthPage() {
   const [confirmationResent, setConfirmationResent] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled && data.user) window.location.replace("/dashboard");
+    });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     const reason = searchParams.get("reason");
     if (searchParams.get("message") === "confirmed") {
       setMessage("Email confirmé. Tu peux maintenant te connecter.");
